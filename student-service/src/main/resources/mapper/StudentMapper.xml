@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.yun.studentcourse.student.mapper.StudentMapper">
+
+    <resultMap id="StudentResultMap" type="com.yun.studentcourse.student.entity.Student">
+        <id column="student_id" property="studentId"/>
+        <result column="student_no" property="studentNo"/>
+        <result column="name" property="name"/>
+        <result column="major" property="major"/>
+        <result column="grade" property="grade"/>
+        <result column="phone" property="phone"/>
+        <result column="email" property="email"/>
+        <result column="status" property="status"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <sql id="StudentColumns">
+        student_id, student_no, name, major, grade, phone, email, status, create_time, update_time
+    </sql>
+
+    <insert id="insert" parameterType="com.yun.studentcourse.student.entity.Student" useGeneratedKeys="true" keyProperty="studentId">
+        INSERT INTO student (
+            student_no, name, major, grade, phone, email, status
+        ) VALUES (
+            #{studentNo}, #{name}, #{major}, #{grade}, #{phone}, #{email}, #{status}
+        )
+    </insert>
+
+    <select id="findById" resultMap="StudentResultMap">
+        SELECT <include refid="StudentColumns"/>
+        FROM student
+        WHERE student_id = #{studentId}
+    </select>
+
+    <select id="findByStudentNo" resultMap="StudentResultMap">
+        SELECT <include refid="StudentColumns"/>
+        FROM student
+        WHERE student_no = #{studentNo}
+    </select>
+
+    <select id="findPage" resultMap="StudentResultMap">
+        SELECT <include refid="StudentColumns"/>
+        FROM student
+        <where>
+            <if test="keyword != null and keyword != ''">
+                AND (
+                    student_no LIKE CONCAT('%', #{keyword}, '%')
+                    OR name LIKE CONCAT('%', #{keyword}, '%')
+                    OR major LIKE CONCAT('%', #{keyword}, '%')
+                )
+            </if>
+        </where>
+        ORDER BY student_id DESC
+        LIMIT #{offset}, #{pageSize}
+    </select>
+
+    <select id="count" resultType="long">
+        SELECT COUNT(1)
+        FROM student
+        <where>
+            <if test="keyword != null and keyword != ''">
+                AND (
+                    student_no LIKE CONCAT('%', #{keyword}, '%')
+                    OR name LIKE CONCAT('%', #{keyword}, '%')
+                    OR major LIKE CONCAT('%', #{keyword}, '%')
+                )
+            </if>
+        </where>
+    </select>
+
+    <update id="update" parameterType="com.yun.studentcourse.student.entity.Student">
+        UPDATE student
+        SET name = #{name},
+            major = #{major},
+            grade = #{grade},
+            phone = #{phone},
+            email = #{email},
+            status = #{status}
+        WHERE student_id = #{studentId}
+    </update>
+</mapper>

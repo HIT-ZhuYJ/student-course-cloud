@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.yun.studentcourse.teacher.mapper.TeacherCourseAssignmentMapper">
+
+    <resultMap id="TeacherCourseAssignmentResultMap" type="com.yun.studentcourse.teacher.entity.TeacherCourseAssignment">
+        <id column="id" property="id"/>
+        <result column="teacher_id" property="teacherId"/>
+        <result column="course_id" property="courseId"/>
+        <result column="status" property="status"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.yun.studentcourse.teacher.entity.TeacherCourseAssignment" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO teacher_course_assignment (
+            teacher_id, course_id, status
+        ) VALUES (
+            #{teacherId}, #{courseId}, #{status}
+        )
+    </insert>
+
+    <select id="findByTeacherIdAndCourseId" resultMap="TeacherCourseAssignmentResultMap">
+        SELECT id, teacher_id, course_id, status, create_time, update_time
+        FROM teacher_course_assignment
+        WHERE teacher_id = #{teacherId}
+          AND course_id = #{courseId}
+    </select>
+
+    <select id="findActiveByCourseId" resultMap="TeacherCourseAssignmentResultMap">
+        SELECT id, teacher_id, course_id, status, create_time, update_time
+        FROM teacher_course_assignment
+        WHERE course_id = #{courseId}
+          AND status = 'ACTIVE'
+        ORDER BY id DESC
+        LIMIT 1
+    </select>
+
+    <select id="findActiveByTeacherId" resultMap="TeacherCourseAssignmentResultMap">
+        SELECT id, teacher_id, course_id, status, create_time, update_time
+        FROM teacher_course_assignment
+        WHERE teacher_id = #{teacherId}
+          AND status = 'ACTIVE'
+        ORDER BY course_id ASC
+    </select>
+
+    <update id="activate">
+        UPDATE teacher_course_assignment
+        SET status = 'ACTIVE'
+        WHERE id = #{id}
+    </update>
+
+    <update id="cancel">
+        UPDATE teacher_course_assignment
+        SET status = 'CANCELLED'
+        WHERE teacher_id = #{teacherId}
+          AND course_id = #{courseId}
+          AND status = 'ACTIVE'
+    </update>
+
+    <update id="cancelActiveByTeacherId">
+        UPDATE teacher_course_assignment
+        SET status = 'CANCELLED'
+        WHERE teacher_id = #{teacherId}
+          AND status = 'ACTIVE'
+    </update>
+</mapper>
