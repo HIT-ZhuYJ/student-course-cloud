@@ -3,9 +3,9 @@
     <div class="section-toolbar">
       <div>
         <h2>课程列表</h2>
-        <p class="muted">课程数据来自 Gateway 的 /api/courses，点击选课后会调用选课服务完成校验。</p>
+        <p class="muted">课程数据来自 Gateway 的 /api/courses，选课会调用 enrollment-service 完成容量、教师分配和时间冲突校验。</p>
       </div>
-      <button class="secondary-button" type="button" @click="loadCourses">刷新</button>
+      <button class="secondary-button" type="button" @click="loadCourses()">刷新</button>
     </div>
 
     <p v-if="error" class="error-text">{{ error }}</p>
@@ -60,11 +60,13 @@ const error = ref('')
 const message = ref('')
 const loadingCourseId = ref(null)
 
-onMounted(loadCourses)
+onMounted(() => loadCourses())
 
-async function loadCourses() {
+async function loadCourses(clearNotice = true) {
   error.value = ''
-  message.value = ''
+  if (clearNotice) {
+    message.value = ''
+  }
   try {
     const res = await listCourses({ pageNo: 1, pageSize: 50, status: 'OPEN' })
     courses.value = res.data?.records || []
@@ -79,11 +81,14 @@ async function submitEnroll(courseId) {
   loadingCourseId.value = courseId
   try {
     const studentId = Number(localStorage.getItem('relatedId'))
+    if (!studentId) {
+      throw new Error('未获取到当前学生身份，请重新登录')
+    }
     await enroll({ studentId, courseId })
     message.value = '选课成功'
-    await loadCourses()
+    await loadCourses(false)
   } catch (err) {
-    error.value = err.normalizedMessage || '选课失败，可能是课程已满、时间冲突或服务暂不可用'
+    error.value = err.normalizedMessage || err.message || '选课失败，可能是课程已满、时间冲突或服务暂时不可用'
   } finally {
     loadingCourseId.value = null
   }

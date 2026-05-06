@@ -1,0 +1,31 @@
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:${studentcourse.eureka.default-zone:http://localhost:8761/eureka/}}
+
+mybatis:
+  mapper-locations: classpath*:mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+
+studentcourse:
+  mysql:
+    host: localhost
+    port: 3306
+    params: useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+  eureka:
+    default-zone: http://localhost:8761/eureka/
+  frontend:
+    origin: http://localhost:5173
+  nginx:
+    origin: http://localhost
+
+jwt:
+  secret: ${JWT_SECRET:local-demo-secret-change-me}
+  expiration-millis: ${JWT_EXPIRATION_MILLIS:86400000}

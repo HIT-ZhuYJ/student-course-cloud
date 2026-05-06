@@ -20,6 +20,7 @@
 
     <modules>
         <module>common-module</module>
+        <module>config-service</module>
         <module>eureka-service</module>
         <module>gateway-service</module>
         <module>student-service</module>

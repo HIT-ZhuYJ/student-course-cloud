@@ -1,26 +1,7 @@
-server:
-  port: 8761
-
 spring:
   application:
     name: eureka-service
-
-eureka:
-  client:
-    register-with-eureka: false
-    fetch-registry: false
-    service-url:
-      defaultZone: http://localhost:8761/eureka/
-  server:
-    enable-self-preservation: false
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info
-
-logging:
-  level:
-    com.netflix.eureka: info
-    com.netflix.discovery: info
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
+  config:
+    import: "configserver:${CONFIG_SERVER_URL:http://localhost:8888}"

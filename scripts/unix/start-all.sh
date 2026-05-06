@@ -8,10 +8,12 @@ mkdir -p "$LOG_DIR"
 MYSQL_USER="${MYSQL_USER:-root}"
 MYSQL_PASSWORD="${MYSQL_PASSWORD:-123888}"
 JWT_SECRET="${JWT_SECRET:-local-demo-secret-change-me}"
+CONFIG_SERVER_URL="${CONFIG_SERVER_URL:-http://localhost:8888}"
+APP_SPRING_PROFILE="${SPRING_PROFILES_ACTIVE:-local}"
 SKIP_BUILD="${SKIP_BUILD:-0}"
 SKIP_FRONTEND="${SKIP_FRONTEND:-0}"
 
-export MYSQL_USER MYSQL_PASSWORD JWT_SECRET
+export MYSQL_USER MYSQL_PASSWORD JWT_SECRET CONFIG_SERVER_URL
 
 command -v java >/dev/null 2>&1 || {
   echo "java was not found. Please install Java 17 and add it to PATH." >&2
@@ -51,6 +53,9 @@ start_service() {
   sleep "$delay"
 }
 
+export SPRING_PROFILES_ACTIVE=native
+start_service "config-service" 10
+export SPRING_PROFILES_ACTIVE="$APP_SPRING_PROFILE"
 start_service "eureka-service" 12
 start_service "student-service" 4
 start_service "course-service" 4
@@ -79,6 +84,7 @@ fi
 
 echo ""
 echo "Startup commands submitted."
+echo "Config:   http://localhost:8888"
 echo "Eureka:   http://localhost:8761"
 echo "Gateway:  http://localhost:8080"
 echo "Frontend: http://localhost:5173"

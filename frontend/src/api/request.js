@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 const request = axios.create({
-  baseURL: 'http://localhost:8080',
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080',
   timeout: 8000
 })
 
@@ -17,9 +17,10 @@ request.interceptors.response.use(
   (response) => {
     const body = response.data
     if (body && typeof body.code === 'number' && body.code !== 200) {
-      const error = new Error(body.message || '请求失败')
+      const message = body.message || '请求失败'
+      const error = new Error(message)
       error.response = response
-      error.normalizedMessage = body.message || '请求失败'
+      error.normalizedMessage = message
       return Promise.reject(error)
     }
     return body
@@ -29,9 +30,7 @@ request.interceptors.response.use(
     const message = error.response?.data?.message || error.message || '请求失败'
 
     if (status === 401) {
-      localStorage.removeItem('token')
-      localStorage.removeItem('tokenType')
-      localStorage.removeItem('role')
+      clearLoginState()
       if (window.location.pathname !== '/login') {
         window.location.href = '/login'
       }
@@ -48,5 +47,14 @@ request.interceptors.response.use(
     return Promise.reject(error)
   }
 )
+
+function clearLoginState() {
+  localStorage.removeItem('token')
+  localStorage.removeItem('tokenType')
+  localStorage.removeItem('role')
+  localStorage.removeItem('userId')
+  localStorage.removeItem('username')
+  localStorage.removeItem('relatedId')
+}
 
 export default request

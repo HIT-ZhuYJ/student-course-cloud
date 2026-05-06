@@ -705,7 +705,6 @@ docs/local-test-flow.md
 - 使用 Nacos
 - 使用 Redis
 - 使用 RabbitMQ/Kafka
-- 使用 Spring Cloud Config
 - 使用 Ribbon
 - 使用 Hystrix
 - 使用 Seata 或其他分布式事务框架

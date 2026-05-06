@@ -88,8 +88,11 @@ public class EnrollmentServiceImpl implements EnrollmentService {
 
     @Override
     @Transactional
-    public EnrollmentResponse drop(Long enrollmentId) {
+    public EnrollmentResponse drop(Long enrollmentId, Long requesterStudentId, boolean admin) {
         Enrollment enrollment = requireEnrollment(enrollmentId);
+        if (!admin && (requesterStudentId == null || !requesterStudentId.equals(enrollment.getStudentId()))) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "students can only drop their own enrollments");
+        }
         if (DROPPED.equals(enrollment.getStatus())) {
             throw new BusinessException(ErrorCode.CONFLICT, "enrollment has already been dropped");
         }

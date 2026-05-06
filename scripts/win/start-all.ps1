@@ -2,6 +2,8 @@ param(
     [string]$MysqlUser = "root",
     [string]$MysqlPassword = "123888",
     [string]$JwtSecret = "local-demo-secret-change-me",
+    [string]$ConfigServerUrl = "http://localhost:8888",
+    [string]$SpringProfile = "local",
     [switch]$SkipBuild,
     [switch]$SkipFrontend
 )
@@ -39,24 +41,30 @@ function Start-JavaService {
     )
 
     $jar = Get-ServiceJar $ModuleName
-    $log = Join-Path $LogDir "$ModuleName.log"
+    $outLog = Join-Path $LogDir "$ModuleName.out.log"
+    $errLog = Join-Path $LogDir "$ModuleName.err.log"
+    $pidFile = Join-Path $LogDir "$ModuleName.pid"
 
     Write-Host "Starting $ModuleName ..."
-    $job = Start-Job -Name $ModuleName -ScriptBlock {
-        param($RootPath, $JarPath, $LogPath, $User, $Password, $Secret)
-        Set-Location $RootPath
-        $env:MYSQL_USER = $User
-        $env:MYSQL_PASSWORD = $Password
-        $env:JWT_SECRET = $Secret
-        & java -jar $JarPath *> $LogPath
-    } -ArgumentList $Root, $jar, $log, $MysqlUser, $MysqlPassword, $JwtSecret
-
-    Write-Host "  job id: $($job.Id), log: $log"
+    $process = Start-Process -FilePath "java" `
+        -ArgumentList @("-jar", $jar) `
+        -WorkingDirectory $Root `
+        -RedirectStandardOutput $outLog `
+        -RedirectStandardError $errLog `
+        -WindowStyle Hidden `
+        -PassThru
+    Set-Content -Path $pidFile -Value $process.Id
+    Write-Host "  pid: $($process.Id), out: $outLog, err: $errLog"
     Start-Sleep -Seconds $DelaySeconds
 }
 
 Test-CommandExists "java"
 Test-CommandExists "mvn"
+
+$env:MYSQL_USER = $MysqlUser
+$env:MYSQL_PASSWORD = $MysqlPassword
+$env:JWT_SECRET = $JwtSecret
+$env:CONFIG_SERVER_URL = $ConfigServerUrl
 
 if (-not $SkipBuild) {
     Write-Host "Building backend modules ..."
@@ -65,6 +73,9 @@ if (-not $SkipBuild) {
     Pop-Location
 }
 
+$env:SPRING_PROFILES_ACTIVE = "native"
+Start-JavaService "config-service" 10
+$env:SPRING_PROFILES_ACTIVE = $SpringProfile
 Start-JavaService "eureka-service" 12
 Start-JavaService "student-service" 4
 Start-JavaService "course-service" 4
@@ -75,7 +86,9 @@ Start-JavaService "gateway-service" 6
 if (-not $SkipFrontend) {
     Test-CommandExists "npm.cmd"
     $frontendDir = Join-Path $Root "frontend"
-    $frontendLog = Join-Path $LogDir "frontend.log"
+    $frontendOutLog = Join-Path $LogDir "frontend.out.log"
+    $frontendErrLog = Join-Path $LogDir "frontend.err.log"
+    $frontendPidFile = Join-Path $LogDir "frontend.pid"
 
     if (-not (Test-Path (Join-Path $frontendDir "node_modules"))) {
         Write-Host "Installing frontend dependencies ..."
@@ -85,19 +98,23 @@ if (-not $SkipFrontend) {
     }
 
     Write-Host "Starting frontend ..."
-    $frontendJob = Start-Job -Name "frontend" -ScriptBlock {
-        param($FrontendPath, $LogPath)
-        Set-Location $FrontendPath
-        & npm.cmd run dev *> $LogPath
-    } -ArgumentList $frontendDir, $frontendLog
-    Write-Host "  job id: $($frontendJob.Id), log: $frontendLog"
+    $frontendProcess = Start-Process -FilePath "npm.cmd" `
+        -ArgumentList @("run", "dev") `
+        -WorkingDirectory $frontendDir `
+        -RedirectStandardOutput $frontendOutLog `
+        -RedirectStandardError $frontendErrLog `
+        -WindowStyle Hidden `
+        -PassThru
+    Set-Content -Path $frontendPidFile -Value $frontendProcess.Id
+    Write-Host "  pid: $($frontendProcess.Id), out: $frontendOutLog, err: $frontendErrLog"
 }
 
 Write-Host ""
 Write-Host "Startup commands submitted."
+Write-Host "Config:   http://localhost:8888"
 Write-Host "Eureka:   http://localhost:8761"
 Write-Host "Gateway:  http://localhost:8080"
 Write-Host "Frontend: http://localhost:5173"
 Write-Host ""
-Write-Host "Use Get-Job to view background jobs."
-Write-Host "Use Stop-Job *; Remove-Job * to stop jobs started by this script."
+Write-Host "PID files are in $LogDir."
+Write-Host "Use scripts\win\stop-all.ps1 to stop services started by this script."

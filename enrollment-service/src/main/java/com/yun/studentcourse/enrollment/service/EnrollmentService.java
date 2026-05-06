@@ -11,7 +11,7 @@ public interface EnrollmentService {
 
     EnrollmentResponse enroll(EnrollmentCreateRequest request);
 
-    EnrollmentResponse drop(Long enrollmentId);
+    EnrollmentResponse drop(Long enrollmentId, Long requesterStudentId, boolean admin);
 
     List<EnrollmentResponse> listStudentEnrollments(Long studentId);
 

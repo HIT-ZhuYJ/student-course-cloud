@@ -1,4 +1,5 @@
 com\yun\studentcourse\teacher\dto\TeacherUpdateRequest.class
+com\yun\studentcourse\teacher\exception\GlobalExceptionHandler$1.class
 com\yun\studentcourse\teacher\mapper\TeacherMapper.class
 com\yun\studentcourse\teacher\service\TeacherService.class
 com\yun\studentcourse\teacher\controller\TeacherController.class

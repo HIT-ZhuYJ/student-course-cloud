@@ -60,7 +60,6 @@ public class CourseServiceImpl implements CourseService {
     @Transactional
     public CourseResponse updateCourse(Long courseId, CourseUpdateRequest request) {
         Course course = requireCourse(courseId);
-        validateStatus(request.getStatus());
         if (request.getCapacity() < course.getSelectedCount()) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "capacity cannot be less than selectedCount");
         }

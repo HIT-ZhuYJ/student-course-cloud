@@ -1,0 +1,19 @@
+server:
+  port: 8081
+
+spring:
+  datasource:
+    type: com.zaxxer.hikari.HikariDataSource
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${studentcourse.mysql.host}:${studentcourse.mysql.port}/db_student?${studentcourse.mysql.params}
+    username: ${MYSQL_USER:root}
+    password: ${MYSQL_PASSWORD:123888}
+    hikari:
+      pool-name: student-service-hikari
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000
+
+logging:
+  level:
+    com.yun.studentcourse.student: info

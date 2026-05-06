@@ -1,37 +1,7 @@
-server:
-  port: 8082
-
 spring:
   application:
     name: course-service
-  datasource:
-    type: com.zaxxer.hikari.HikariDataSource
-    driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/db_course?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
-    username: ${MYSQL_USER:root}
-    password: ${MYSQL_PASSWORD:123456}
-    hikari:
-      pool-name: course-service-hikari
-      maximum-pool-size: 10
-      minimum-idle: 2
-      connection-timeout: 30000
-
-mybatis:
-  mapper-locations: classpath*:mapper/**/*.xml
-  configuration:
-    map-underscore-to-camel-case: true
-
-eureka:
-  client:
-    service-url:
-      defaultZone: http://localhost:8761/eureka/
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info
-
-logging:
-  level:
-    com.yun.studentcourse.course: info
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
+  config:
+    import: "configserver:${CONFIG_SERVER_URL:http://localhost:8888}"

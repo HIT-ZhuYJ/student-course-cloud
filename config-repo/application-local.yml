@@ -1,0 +1,10 @@
+studentcourse:
+  mysql:
+    host: ${MYSQL_HOST:localhost}
+    port: ${MYSQL_PORT:3306}
+  eureka:
+    default-zone: http://localhost:8761/eureka/
+  frontend:
+    origin: http://localhost:5173
+  nginx:
+    origin: http://localhost

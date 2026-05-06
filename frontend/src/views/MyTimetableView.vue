@@ -5,7 +5,7 @@
         <h2>我的课表</h2>
         <p class="muted">课表和退课都通过 Gateway 调用 enrollment-service。</p>
       </div>
-      <button class="secondary-button" type="button" @click="loadData">刷新</button>
+      <button class="secondary-button" type="button" @click="loadData()">刷新</button>
     </div>
 
     <p v-if="error" class="error-text">{{ error }}</p>
@@ -83,13 +83,18 @@ const error = ref('')
 const message = ref('')
 const droppingId = ref(null)
 
-onMounted(loadData)
+onMounted(() => loadData())
 
-async function loadData() {
+async function loadData(clearNotice = true) {
   error.value = ''
-  message.value = ''
+  if (clearNotice) {
+    message.value = ''
+  }
   try {
     const studentId = Number(localStorage.getItem('relatedId'))
+    if (!studentId) {
+      throw new Error('未获取到当前学生身份，请重新登录')
+    }
     const [scheduleRes, enrollmentRes] = await Promise.all([
       getStudentTimetable(studentId),
       listStudentEnrollments(studentId)
@@ -97,7 +102,7 @@ async function loadData() {
     timetable.value = scheduleRes.data || []
     enrollments.value = enrollmentRes.data || []
   } catch (err) {
-    error.value = err.normalizedMessage || '课表加载失败'
+    error.value = err.normalizedMessage || err.message || '课表加载失败'
   }
 }
 
@@ -108,9 +113,9 @@ async function drop(enrollmentId) {
   try {
     await dropEnrollment(enrollmentId)
     message.value = '退课成功'
-    await loadData()
+    await loadData(false)
   } catch (err) {
-    error.value = err.normalizedMessage || '退课失败，服务可能暂时不可用'
+    error.value = err.normalizedMessage || err.message || '退课失败，服务可能暂时不可用'
   } finally {
     droppingId.value = null
   }

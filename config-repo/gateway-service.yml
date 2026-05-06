@@ -1,0 +1,64 @@
+server:
+  port: 8080
+
+spring:
+  cloud:
+    gateway:
+      default-filters:
+        - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials
+      globalcors:
+        add-to-simple-url-handler-mapping: true
+        cors-configurations:
+          '[/**]':
+            allowed-origins:
+              - ${studentcourse.frontend.origin:http://localhost:5173}
+              - ${studentcourse.nginx.origin:http://localhost}
+            allowed-methods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+            allowed-headers: '*'
+            allow-credentials: true
+      routes:
+        - id: auth-route
+          uri: lb://student-service
+          predicates:
+            - Path=/api/auth/**
+          filters:
+            - StripPrefix=1
+        - id: student-route
+          uri: lb://student-service
+          predicates:
+            - Path=/api/students/**
+          filters:
+            - StripPrefix=1
+        - id: course-route
+          uri: lb://course-service
+          predicates:
+            - Path=/api/courses/**
+          filters:
+            - StripPrefix=1
+        - id: teacher-route
+          uri: lb://teacher-service
+          predicates:
+            - Path=/api/teachers/**
+          filters:
+            - StripPrefix=1
+        - id: enrollment-route
+          uri: lb://enrollment-service
+          predicates:
+            - Path=/api/enrollments/**
+          filters:
+            - StripPrefix=1
+
+jwt:
+  permit-paths:
+    - /api/auth/login
+    - /api/auth/register
+
+logging:
+  level:
+    org.springframework.cloud.gateway: info
+    com.yun.studentcourse.gateway: info

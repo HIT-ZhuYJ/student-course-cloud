@@ -1,5 +1,6 @@
 com\yun\studentcourse\enrollment\client\fallback\TeacherClientFallback.class
 com\yun\studentcourse\enrollment\client\dto\StudentStatusResponse.class
+com\yun\studentcourse\enrollment\exception\GlobalExceptionHandler$1.class
 com\yun\studentcourse\enrollment\dto\EnrollmentResponse.class
 com\yun\studentcourse\enrollment\client\dto\CourseCapacityResponse.class
 com\yun\studentcourse\enrollment\dto\TimetableResponse.class

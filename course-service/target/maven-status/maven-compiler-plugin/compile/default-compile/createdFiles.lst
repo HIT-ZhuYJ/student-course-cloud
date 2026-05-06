@@ -7,6 +7,7 @@ com\yun\studentcourse\course\CourseServiceApplication.class
 com\yun\studentcourse\course\entity\CourseSchedule.class
 com\yun\studentcourse\course\entity\Course.class
 com\yun\studentcourse\course\service\CourseService.class
+com\yun\studentcourse\course\exception\GlobalExceptionHandler$1.class
 com\yun\studentcourse\course\service\impl\CourseServiceImpl.class
 com\yun\studentcourse\course\exception\GlobalExceptionHandler.class
 com\yun\studentcourse\course\dto\CourseScheduleResponse.class

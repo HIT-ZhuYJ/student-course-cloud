@@ -498,22 +498,58 @@ student-service is unavailable
 
 ## 9. 停止服务
 
-Windows 自动脚本使用 PowerShell Job 启动服务，可以查看并停止：
+Windows 自动脚本会在 `logs/` 下生成 PID 文件，推荐使用停止脚本：
 
 ```powershell
-Get-Job
-Stop-Job *
-Remove-Job *
+cd D:\demo\YunSoftwareSystem
+.\scripts\win\stop-all.ps1
 ```
 
-Linux/macOS 自动脚本会在 `logs/` 下生成 PID 文件，可以停止：
+如果想保留前端，只停止后端：
+
+```powershell
+.\scripts\win\stop-all.ps1 -KeepFrontend
+```
+
+Linux/macOS 自动脚本会在 `logs/` 下生成 PID 文件，推荐使用停止脚本：
 
 ```bash
-kill $(cat logs/eureka-service.pid)
-kill $(cat logs/student-service.pid)
-kill $(cat logs/course-service.pid)
-kill $(cat logs/teacher-service.pid)
-kill $(cat logs/enrollment-service.pid)
-kill $(cat logs/gateway-service.pid)
-kill $(cat logs/frontend.pid)
+cd /path/to/YunSoftwareSystem
+bash scripts/unix/stop-all.sh
 ```
+
+如果想保留前端，只停止后端：
+
+```bash
+KEEP_FRONTEND=1 bash scripts/unix/stop-all.sh
+```
+
+## 10. Spring Cloud Config 配置中心
+
+本项目已加入独立 `config-service` 配置中心，端口为 `8888`。除 `config-service` 外，后端微服务启动时都会先读取：
+
+```text
+http://localhost:8888
+```
+
+本机启动顺序调整为：
+
+```text
+MySQL -> config-service -> eureka-service -> student/course/teacher/enrollment -> gateway-service -> frontend
+```
+
+集中配置文件位于：
+
+```text
+config-repo/
+```
+
+本机部署默认使用 `local` profile。可以通过下面命令验证配置中心：
+
+```powershell
+curl http://localhost:8888/actuator/health
+curl http://localhost:8888/student-service/local
+curl http://localhost:8888/gateway-service/local
+```
+
+更多说明见 `docs/config-center.md`。

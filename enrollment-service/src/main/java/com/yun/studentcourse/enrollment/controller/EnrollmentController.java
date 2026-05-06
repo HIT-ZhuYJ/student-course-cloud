@@ -1,6 +1,8 @@
 package com.yun.studentcourse.enrollment.controller;
 
 import com.yun.studentcourse.common.Result;
+import com.yun.studentcourse.common.BusinessException;
+import com.yun.studentcourse.common.ErrorCode;
 import com.yun.studentcourse.common.dto.PageResult;
 import com.yun.studentcourse.enrollment.dto.EnrollmentCreateRequest;
 import com.yun.studentcourse.enrollment.dto.EnrollmentResponse;
@@ -12,6 +14,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -20,6 +23,9 @@ import java.util.List;
 @RestController
 public class EnrollmentController {
 
+    private static final String ROLE_ADMIN = "ADMIN";
+    private static final String ROLE_STUDENT = "STUDENT";
+
     private final EnrollmentService enrollmentService;
 
     public EnrollmentController(EnrollmentService enrollmentService) {
@@ -27,22 +33,41 @@ public class EnrollmentController {
     }
 
     @PostMapping("/enrollments")
-    public Result<EnrollmentResponse> enroll(@Valid @RequestBody EnrollmentCreateRequest request) {
+    public Result<EnrollmentResponse> enroll(
+            @RequestHeader("X-Role") String role,
+            @RequestHeader(value = "X-Related-Id", required = false) Long relatedId,
+            @Valid @RequestBody EnrollmentCreateRequest request
+    ) {
+        requireStudentOwnerOrAdmin(role, relatedId, request.getStudentId());
         return Result.success(enrollmentService.enroll(request));
     }
 
     @DeleteMapping("/enrollments/{enrollmentId}")
-    public Result<EnrollmentResponse> drop(@PathVariable Long enrollmentId) {
-        return Result.success(enrollmentService.drop(enrollmentId));
+    public Result<EnrollmentResponse> drop(
+            @RequestHeader("X-Role") String role,
+            @RequestHeader(value = "X-Related-Id", required = false) Long relatedId,
+            @PathVariable Long enrollmentId
+    ) {
+        return Result.success(enrollmentService.drop(enrollmentId, requesterStudentId(role, relatedId), isAdmin(role)));
     }
 
     @GetMapping("/enrollments/students/{studentId}")
-    public Result<List<EnrollmentResponse>> listStudentEnrollments(@PathVariable Long studentId) {
+    public Result<List<EnrollmentResponse>> listStudentEnrollments(
+            @RequestHeader("X-Role") String role,
+            @RequestHeader(value = "X-Related-Id", required = false) Long relatedId,
+            @PathVariable Long studentId
+    ) {
+        requireStudentOwnerOrAdmin(role, relatedId, studentId);
         return Result.success(enrollmentService.listStudentEnrollments(studentId));
     }
 
     @GetMapping("/enrollments/students/{studentId}/timetable")
-    public Result<List<TimetableResponse>> getStudentTimetable(@PathVariable Long studentId) {
+    public Result<List<TimetableResponse>> getStudentTimetable(
+            @RequestHeader("X-Role") String role,
+            @RequestHeader(value = "X-Related-Id", required = false) Long relatedId,
+            @PathVariable Long studentId
+    ) {
+        requireStudentOwnerOrAdmin(role, relatedId, studentId);
         return Result.success(enrollmentService.getStudentTimetable(studentId));
     }
 
@@ -55,5 +80,23 @@ public class EnrollmentController {
             @RequestParam(required = false) String status
     ) {
         return Result.success(enrollmentService.listEnrollments(pageNo, pageSize, studentId, courseId, status));
+    }
+
+    private void requireStudentOwnerOrAdmin(String role, Long relatedId, Long targetStudentId) {
+        if (isAdmin(role)) {
+            return;
+        }
+        if (ROLE_STUDENT.equals(role) && relatedId != null && relatedId.equals(targetStudentId)) {
+            return;
+        }
+        throw new BusinessException(ErrorCode.FORBIDDEN, "students can only operate their own enrollments");
+    }
+
+    private Long requesterStudentId(String role, Long relatedId) {
+        return ROLE_STUDENT.equals(role) ? relatedId : null;
+    }
+
+    private boolean isAdmin(String role) {
+        return ROLE_ADMIN.equals(role);
     }
 }
