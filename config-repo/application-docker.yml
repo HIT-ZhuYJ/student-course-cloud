@@ -8,3 +8,7 @@ studentcourse:
     origin: http://localhost
   nginx:
     origin: http://localhost
+
+eureka:
+  instance:
+    prefer-ip-address: true

@@ -5,11 +5,18 @@
 
 # Logs and runtime files
 logs/
-log/docker/*
-!log/docker/.gitkeep
+log/
 *.log
+*.log.*
 *.pid
 *.out
+hs_err_pid*
+replay_pid*
+
+# Local agent instructions
+AGENTS.md
+AGENT.md
+agent.md
 
 # Maven
 **/target/

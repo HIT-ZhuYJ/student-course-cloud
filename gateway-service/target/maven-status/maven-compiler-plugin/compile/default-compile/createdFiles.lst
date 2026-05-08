@@ -1,3 +1,0 @@
-com\yun\studentcourse\gateway\properties\JwtProperties.class
-com\yun\studentcourse\gateway\GatewayServiceApplication.class
-com\yun\studentcourse\gateway\filter\JwtAuthenticationFilter.class

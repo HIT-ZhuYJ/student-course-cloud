@@ -111,7 +111,10 @@ public class TeacherServiceImpl implements TeacherService {
         }
 
         TeacherCourseAssignment activeAssignment = assignmentMapper.findActiveByCourseId(courseId);
-        if (activeAssignment != null && !activeAssignment.getTeacherId().equals(teacherId)) {
+        if (activeAssignment != null) {
+            if (activeAssignment.getTeacherId().equals(teacherId)) {
+                throw new BusinessException(ErrorCode.CONFLICT, "teacher already assigned to this course");
+            }
             throw new BusinessException(ErrorCode.CONFLICT, "course already has an active teacher");
         }
 
