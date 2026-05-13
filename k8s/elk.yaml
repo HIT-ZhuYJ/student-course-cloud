@@ -1,0 +1,205 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: elasticsearch
+  namespace: student-course
+spec:
+  type: NodePort
+  selector:
+    app: elasticsearch
+  ports:
+    - name: http
+      port: 9200
+      targetPort: 9200
+      nodePort: 30200
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: elasticsearch
+  namespace: student-course
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: elasticsearch
+  template:
+    metadata:
+      labels:
+        app: elasticsearch
+        app.kubernetes.io/part-of: student-course-cloud
+    spec:
+      nodeSelector:
+        scms-role: data
+      containers:
+        - name: elasticsearch
+          image: elasticsearch:8.15.2
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: discovery.type
+              value: single-node
+            - name: xpack.security.enabled
+              value: "false"
+            - name: ES_JAVA_OPTS
+              value: -Xms512m -Xmx512m
+          ports:
+            - containerPort: 9200
+          readinessProbe:
+            httpGet:
+              path: /_cluster/health
+              port: 9200
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 18
+          resources:
+            requests:
+              cpu: 200m
+              memory: 1Gi
+            limits:
+              cpu: "1"
+              memory: 2Gi
+          volumeMounts:
+            - name: elasticsearch-data
+              mountPath: /usr/share/elasticsearch/data
+      volumes:
+        - name: elasticsearch-data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: logstash
+  namespace: student-course
+spec:
+  type: NodePort
+  selector:
+    app: logstash
+  ports:
+    - name: beats
+      port: 5044
+      targetPort: 5044
+      nodePort: 30504
+    - name: monitoring
+      port: 9600
+      targetPort: 9600
+      nodePort: 30600
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: logstash
+  namespace: student-course
+spec:
+  selector:
+    matchLabels:
+      app: logstash
+  template:
+    metadata:
+      labels:
+        app: logstash
+        app.kubernetes.io/part-of: student-course-cloud
+    spec:
+      nodeSelector:
+        scms-log: enabled
+      securityContext:
+        runAsUser: 0
+        runAsGroup: 0
+      containers:
+        - name: logstash
+          image: logstash:8.15.2
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: LS_JAVA_OPTS
+              value: -Xms128m -Xmx256m
+          ports:
+            - containerPort: 5044
+            - containerPort: 9600
+          resources:
+            requests:
+              cpu: 100m
+              memory: 384Mi
+            limits:
+              cpu: 700m
+              memory: 768Mi
+          volumeMounts:
+            - name: pipeline
+              mountPath: /usr/share/logstash/pipeline/logstash.conf
+              subPath: logstash.conf
+              readOnly: true
+            - name: varlogcontainers
+              mountPath: /var/log/containers
+              readOnly: true
+            - name: varlogpods
+              mountPath: /var/log/pods
+              readOnly: true
+            - name: logstash-data
+              mountPath: /usr/share/logstash/data
+      volumes:
+        - name: pipeline
+          configMap:
+            name: logstash-pipeline
+        - name: varlogcontainers
+          hostPath:
+            path: /var/log/containers
+        - name: varlogpods
+          hostPath:
+            path: /var/log/pods
+        - name: logstash-data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kibana
+  namespace: student-course
+spec:
+  type: NodePort
+  selector:
+    app: kibana
+  ports:
+    - name: http
+      port: 5601
+      targetPort: 5601
+      nodePort: 30601
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kibana
+  namespace: student-course
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kibana
+  template:
+    metadata:
+      labels:
+        app: kibana
+        app.kubernetes.io/part-of: student-course-cloud
+    spec:
+      nodeSelector:
+        scms-role: data
+      containers:
+        - name: kibana
+          image: kibana:8.15.2
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: ELASTICSEARCH_HOSTS
+              value: http://elasticsearch:9200
+          ports:
+            - containerPort: 5601
+          readinessProbe:
+            httpGet:
+              path: /api/status
+              port: 5601
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            failureThreshold: 30
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              cpu: 800m
+              memory: 1Gi
