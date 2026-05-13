@@ -13,7 +13,40 @@ spring:
       maximum-pool-size: 10
       minimum-idle: 2
       connection-timeout: 30000
+  cloud:
+    openfeign:
+      circuitbreaker:
+        enabled: true
+      client:
+        config:
+          default:
+            connect-timeout: 2000
+            read-timeout: 3000
+            logger-level: basic
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      StudentAccountClient:
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 5s
+        permitted-number-of-calls-in-half-open-state: 3
+      TeacherCourseClient:
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 5s
+        permitted-number-of-calls-in-half-open-state: 3
+  timelimiter:
+    instances:
+      StudentAccountClient:
+        timeout-duration: 3s
+      TeacherCourseClient:
+        timeout-duration: 3s
 
 logging:
   level:
     com.yun.studentcourse.teacher: info
+    com.yun.studentcourse.teacher.client: debug

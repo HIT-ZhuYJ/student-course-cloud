@@ -113,6 +113,19 @@ public class CourseServiceImpl implements CourseService {
         if (!request.getStartTime().isBefore(request.getEndTime())) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "startTime must be before endTime");
         }
+        List<CourseSchedule> classroomConflicts = courseScheduleMapper.findClassroomConflicts(
+                request.getClassroom(),
+                request.getWeekday(),
+                request.getStartTime(),
+                request.getEndTime()
+        );
+        if (!classroomConflicts.isEmpty()) {
+            CourseSchedule conflict = classroomConflicts.get(0);
+            throw new BusinessException(
+                    ErrorCode.CONFLICT,
+                    "classroom schedule conflicts with courseId " + conflict.getCourseId()
+            );
+        }
 
         CourseSchedule schedule = new CourseSchedule();
         schedule.setCourseId(courseId);

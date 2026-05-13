@@ -2,7 +2,14 @@ package com.yun.studentcourse.teacher.service.impl;
 
 import com.yun.studentcourse.common.BusinessException;
 import com.yun.studentcourse.common.ErrorCode;
+import com.yun.studentcourse.common.Result;
 import com.yun.studentcourse.common.dto.PageResult;
+import com.yun.studentcourse.teacher.client.CourseClient;
+import com.yun.studentcourse.teacher.client.StudentAccountClient;
+import com.yun.studentcourse.teacher.client.dto.AccountStatusUpdateRequest;
+import com.yun.studentcourse.teacher.client.dto.CourseScheduleResponse;
+import com.yun.studentcourse.teacher.client.dto.TeacherAccountCreateRequest;
+import com.yun.studentcourse.teacher.client.dto.TeacherAccountResponse;
 import com.yun.studentcourse.teacher.dto.CourseTeacherAssignedResponse;
 import com.yun.studentcourse.teacher.dto.TeacherCourseAssignmentResponse;
 import com.yun.studentcourse.teacher.dto.TeacherCreateRequest;
@@ -28,10 +35,19 @@ public class TeacherServiceImpl implements TeacherService {
 
     private final TeacherMapper teacherMapper;
     private final TeacherCourseAssignmentMapper assignmentMapper;
+    private final StudentAccountClient studentAccountClient;
+    private final CourseClient courseClient;
 
-    public TeacherServiceImpl(TeacherMapper teacherMapper, TeacherCourseAssignmentMapper assignmentMapper) {
+    public TeacherServiceImpl(
+            TeacherMapper teacherMapper,
+            TeacherCourseAssignmentMapper assignmentMapper,
+            StudentAccountClient studentAccountClient,
+            CourseClient courseClient
+    ) {
         this.teacherMapper = teacherMapper;
         this.assignmentMapper = assignmentMapper;
+        this.studentAccountClient = studentAccountClient;
+        this.courseClient = courseClient;
     }
 
     @Override
@@ -51,6 +67,7 @@ public class TeacherServiceImpl implements TeacherService {
         teacher.setEmail(request.getEmail());
         teacher.setStatus(status);
         teacherMapper.insert(teacher);
+        createTeacherAccount(request, teacher.getTeacherId(), status);
         return toTeacherResponse(teacherMapper.findById(teacher.getTeacherId()));
     }
 
@@ -67,6 +84,7 @@ public class TeacherServiceImpl implements TeacherService {
         teacher.setEmail(request.getEmail());
         teacher.setStatus(status);
         teacherMapper.update(teacher);
+        syncTeacherAccountStatus(teacherId, status);
         return toTeacherResponse(teacherMapper.findById(teacherId));
     }
 
@@ -76,6 +94,7 @@ public class TeacherServiceImpl implements TeacherService {
         requireTeacher(teacherId);
         teacherMapper.disable(teacherId);
         assignmentMapper.cancelActiveByTeacherId(teacherId);
+        syncTeacherAccountStatus(teacherId, DISABLED);
     }
 
     @Override
@@ -109,6 +128,7 @@ public class TeacherServiceImpl implements TeacherService {
         if (!ACTIVE.equals(teacher.getStatus())) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "teacher is disabled");
         }
+        validateTeacherScheduleConflict(teacherId, courseId);
 
         TeacherCourseAssignment activeAssignment = assignmentMapper.findActiveByCourseId(courseId);
         if (activeAssignment != null) {
@@ -191,6 +211,85 @@ public class TeacherServiceImpl implements TeacherService {
 
     private String normalizeKeyword(String keyword) {
         return StringUtils.hasText(keyword) ? keyword.trim() : null;
+    }
+
+    private void createTeacherAccount(TeacherCreateRequest request, Long teacherId, String status) {
+        Result<TeacherAccountResponse> result = studentAccountClient.createTeacherAccount(
+                new TeacherAccountCreateRequest(
+                        request.getUsername(),
+                        request.getPassword(),
+                        teacherId,
+                        status
+                )
+        );
+        if (result == null) {
+            throw new BusinessException(ErrorCode.REMOTE_SERVICE_ERROR, "teacher account creation returned empty response");
+        }
+        if (result.getCode() != ErrorCode.SUCCESS.getCode()) {
+            throw new BusinessException(toErrorCode(result.getCode()), result.getMessage());
+        }
+    }
+
+    private void syncTeacherAccountStatus(Long teacherId, String status) {
+        Result<Void> result = studentAccountClient.updateTeacherAccountStatus(
+                teacherId,
+                new AccountStatusUpdateRequest(status)
+        );
+        if (result == null || result.getCode() != ErrorCode.SUCCESS.getCode()) {
+            String message = result == null ? "teacher account status sync returned empty response" : result.getMessage();
+            throw new BusinessException(result == null ? ErrorCode.REMOTE_SERVICE_ERROR : toErrorCode(result.getCode()), message);
+        }
+    }
+
+    private void validateTeacherScheduleConflict(Long teacherId, Long targetCourseId) {
+        List<CourseScheduleResponse> targetSchedules = requireRemoteData(
+                courseClient.getSchedule(targetCourseId),
+                "course schedule query failed"
+        );
+        for (TeacherCourseAssignment assignment : assignmentMapper.findActiveByTeacherId(teacherId)) {
+            if (targetCourseId.equals(assignment.getCourseId())) {
+                continue;
+            }
+            List<CourseScheduleResponse> existingSchedules = requireRemoteData(
+                    courseClient.getSchedule(assignment.getCourseId()),
+                    "teacher assigned course schedule query failed"
+            );
+            for (CourseScheduleResponse existing : existingSchedules) {
+                for (CourseScheduleResponse target : targetSchedules) {
+                    if (isScheduleConflict(existing, target)) {
+                        throw new BusinessException(
+                                ErrorCode.CONFLICT,
+                                "teacher schedule conflicts with assigned courseId " + assignment.getCourseId()
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    private boolean isScheduleConflict(CourseScheduleResponse left, CourseScheduleResponse right) {
+        return left.getWeekday() == right.getWeekday()
+                && left.getStartTime().isBefore(right.getEndTime())
+                && right.getStartTime().isBefore(left.getEndTime());
+    }
+
+    private <T> T requireRemoteData(Result<T> result, String defaultMessage) {
+        if (result == null) {
+            throw new BusinessException(ErrorCode.SERVICE_UNAVAILABLE, defaultMessage);
+        }
+        if (result.getCode() != ErrorCode.SUCCESS.getCode()) {
+            throw new BusinessException(toErrorCode(result.getCode()), StringUtils.hasText(result.getMessage()) ? result.getMessage() : defaultMessage);
+        }
+        return result.getData();
+    }
+
+    private ErrorCode toErrorCode(int code) {
+        for (ErrorCode errorCode : ErrorCode.values()) {
+            if (errorCode.getCode() == code) {
+                return errorCode;
+            }
+        }
+        return ErrorCode.REMOTE_SERVICE_ERROR;
     }
 
     private TeacherResponse toTeacherResponse(Teacher teacher) {

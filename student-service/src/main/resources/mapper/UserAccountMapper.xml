@@ -26,4 +26,11 @@
         FROM user_account
         WHERE username = #{username}
     </select>
+
+    <update id="updateStatusByRoleAndRelatedId">
+        UPDATE user_account
+        SET status = #{status}
+        WHERE role = #{role}
+          AND related_id = #{relatedId}
+    </update>
 </mapper>

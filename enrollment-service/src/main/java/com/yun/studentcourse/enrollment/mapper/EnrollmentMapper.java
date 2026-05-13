@@ -17,6 +17,8 @@ public interface EnrollmentMapper {
 
     List<Enrollment> findActiveByStudentId(@Param("studentId") Long studentId);
 
+    List<Enrollment> findActiveByCourseId(@Param("courseId") Long courseId);
+
     List<Enrollment> findByStudentId(@Param("studentId") Long studentId);
 
     List<Enrollment> findPage(

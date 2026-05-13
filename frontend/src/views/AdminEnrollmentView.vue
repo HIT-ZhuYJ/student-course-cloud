@@ -3,7 +3,6 @@
     <div class="section-toolbar">
       <div>
         <h2>选课记录</h2>
-        <p class="muted">展示 enrollment-service 中的全部选课记录，可按学生、课程和状态筛选。</p>
       </div>
       <button class="secondary-button" type="button" @click="loadEnrollments">刷新</button>
     </div>
@@ -13,6 +12,7 @@
       <input v-model.number="filters.courseId" type="number" min="1" placeholder="课程ID" />
       <input v-model.trim="filters.status" placeholder="ACTIVE / DROPPED" />
       <button class="secondary-button">查询</button>
+      <button class="secondary-button" type="button" @click="exportEnrollments">导出CSV</button>
     </form>
 
     <p v-if="error" class="error-text">{{ error }}</p>
@@ -73,5 +73,30 @@ async function loadEnrollments() {
 
 function formatTime(value) {
   return value ? String(value).replace('T', ' ') : '-'
+}
+
+function exportEnrollments() {
+  downloadCsv('enrollments.csv', [
+    ['enrollmentId', 'studentId', 'courseId', 'status', 'createTime', 'updateTime'],
+    ...enrollments.value.map((item) => [
+      item.enrollmentId,
+      item.studentId,
+      item.courseId,
+      item.status,
+      formatTime(item.createTime),
+      formatTime(item.updateTime)
+    ])
+  ])
+}
+
+function downloadCsv(filename, rows) {
+  const csv = rows.map((row) => row.map((value) => `"${String(value ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')
+  const blob = new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(url)
 }
 </script>

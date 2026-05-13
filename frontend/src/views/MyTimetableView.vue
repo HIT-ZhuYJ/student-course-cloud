@@ -3,7 +3,6 @@
     <div class="section-toolbar">
       <div>
         <h2>我的课表</h2>
-        <p class="muted">课表和退课都通过 Gateway 调用 enrollment-service。</p>
       </div>
       <button class="secondary-button" type="button" @click="loadData()">刷新</button>
     </div>

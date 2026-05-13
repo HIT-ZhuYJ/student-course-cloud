@@ -1,0 +1,14 @@
+studentcourse:
+  mysql:
+    host: mysql
+    port: 3306
+  eureka:
+    default-zone: http://eureka-service:8761/eureka/
+  frontend:
+    origin: http://192.168.40.129:30080
+  nginx:
+    origin: http://192.168.40.129:30080
+
+eureka:
+  instance:
+    prefer-ip-address: true

@@ -4,6 +4,10 @@ export function listCourses(params) {
   return request.get('/api/courses', { params })
 }
 
+export function getCourse(courseId) {
+  return request.get(`/api/courses/${courseId}`)
+}
+
 export function createCourse(data) {
   return request.post('/api/courses', data)
 }

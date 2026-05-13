@@ -44,6 +44,14 @@
         ORDER BY enrollment_id ASC
     </select>
 
+    <select id="findActiveByCourseId" resultMap="EnrollmentResultMap">
+        SELECT <include refid="EnrollmentColumns"/>
+        FROM enrollment
+        WHERE course_id = #{courseId}
+          AND status = 'ACTIVE'
+        ORDER BY enrollment_id ASC
+    </select>
+
     <select id="findByStudentId" resultMap="EnrollmentResultMap">
         SELECT <include refid="EnrollmentColumns"/>
         FROM enrollment

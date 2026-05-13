@@ -4,7 +4,6 @@
       <div>
         <p class="eyebrow">管理员端</p>
         <h1>管理首页</h1>
-        <p class="muted">选择一个管理模块开始课堂演示。</p>
       </div>
     </header>
     <div class="dashboard-grid">

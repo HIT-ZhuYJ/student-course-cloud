@@ -254,36 +254,20 @@ services:
     networks:
       - student-course-net
 
-  frontend:
+  nginx:
     build:
       context: .
-      dockerfile: frontend/Dockerfile
+      dockerfile: docker/nginx/Dockerfile
       args:
         VITE_API_BASE_URL: /
-    container_name: scms-frontend
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/ || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 30
-      start_period: 10s
-    networks:
-      - student-course-net
-
-  nginx:
-    image: nginx:1.27-alpine
     container_name: scms-nginx
     restart: unless-stopped
     depends_on:
-      frontend:
-        condition: service_healthy
       gateway-service:
         condition: service_healthy
     ports:
       - "80:80"
     volumes:
-      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./log/docker/nginx:/var/log/nginx
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/ && wget -q --spider http://127.0.0.1/api/courses"]

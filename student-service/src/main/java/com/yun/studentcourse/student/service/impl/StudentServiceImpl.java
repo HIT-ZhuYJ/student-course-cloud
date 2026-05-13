@@ -9,9 +9,12 @@ import com.yun.studentcourse.common.dto.PageResult;
 import com.yun.studentcourse.common.dto.RegisterRequest;
 import com.yun.studentcourse.common.dto.UserContext;
 import com.yun.studentcourse.common.security.JwtUtil;
+import com.yun.studentcourse.student.dto.AccountStatusUpdateRequest;
 import com.yun.studentcourse.student.dto.StudentResponse;
 import com.yun.studentcourse.student.dto.StudentStatusResponse;
 import com.yun.studentcourse.student.dto.StudentUpdateRequest;
+import com.yun.studentcourse.student.dto.TeacherAccountCreateRequest;
+import com.yun.studentcourse.student.dto.TeacherAccountResponse;
 import com.yun.studentcourse.student.entity.Student;
 import com.yun.studentcourse.student.entity.UserAccount;
 import com.yun.studentcourse.student.mapper.StudentMapper;
@@ -24,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
+import java.util.Objects;
 
 @Service
 public class StudentServiceImpl implements StudentService {
@@ -122,6 +126,7 @@ public class StudentServiceImpl implements StudentService {
             student.setStatus(request.getStatus());
         }
         studentMapper.update(student);
+        userAccountMapper.updateStatusByRoleAndRelatedId(RoleEnum.STUDENT, studentId, student.getStatus());
         return toResponse(studentMapper.findById(studentId));
     }
 
@@ -145,6 +150,37 @@ public class StudentServiceImpl implements StudentService {
             return new StudentStatusResponse(studentId, false, null, false);
         }
         return new StudentStatusResponse(studentId, true, student.getStatus(), ACTIVE.equals(student.getStatus()));
+    }
+
+    @Override
+    @Transactional
+    public TeacherAccountResponse createTeacherAccount(TeacherAccountCreateRequest request) {
+        String status = StringUtils.hasText(request.getStatus()) ? request.getStatus().trim() : ACTIVE;
+        validateStatus(status);
+        UserAccount existing = userAccountMapper.findByUsername(request.getUsername());
+        if (existing != null) {
+            if (RoleEnum.TEACHER.equals(existing.getRole()) && Objects.equals(existing.getRelatedId(), request.getTeacherId())) {
+                return toTeacherAccountResponse(existing);
+            }
+            throw new BusinessException(ErrorCode.CONFLICT, "username already exists");
+        }
+
+        UserAccount account = new UserAccount();
+        account.setUsername(request.getUsername());
+        account.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+        account.setRole(RoleEnum.TEACHER);
+        account.setRelatedId(request.getTeacherId());
+        account.setStatus(status);
+        userAccountMapper.insert(account);
+        return toTeacherAccountResponse(account);
+    }
+
+    @Override
+    @Transactional
+    public void updateTeacherAccountStatus(Long teacherId, AccountStatusUpdateRequest request) {
+        String status = StringUtils.hasText(request.getStatus()) ? request.getStatus().trim() : ACTIVE;
+        validateStatus(status);
+        userAccountMapper.updateStatusByRoleAndRelatedId(RoleEnum.TEACHER, teacherId, status);
     }
 
     private Student requireStudent(Long studentId) {
@@ -177,6 +213,16 @@ public class StudentServiceImpl implements StudentService {
         response.setStatus(student.getStatus());
         response.setCreateTime(student.getCreateTime());
         response.setUpdateTime(student.getUpdateTime());
+        return response;
+    }
+
+    private TeacherAccountResponse toTeacherAccountResponse(UserAccount account) {
+        TeacherAccountResponse response = new TeacherAccountResponse();
+        response.setId(account.getId());
+        response.setUsername(account.getUsername());
+        response.setRole(account.getRole());
+        response.setRelatedId(account.getRelatedId());
+        response.setStatus(account.getStatus());
         return response;
     }
 }

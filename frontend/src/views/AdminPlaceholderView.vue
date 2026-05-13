@@ -4,7 +4,6 @@
       <div>
         <p class="eyebrow">管理员端</p>
         <h1>{{ title }}</h1>
-        <p class="muted">该模块已经接入 Gateway，请通过左侧导航进入正式演示页面。</p>
       </div>
     </header>
   </section>

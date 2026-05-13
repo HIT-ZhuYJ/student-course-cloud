@@ -151,12 +151,47 @@ Invoke-Api `
         weekday = 6
         startTime = "09:00:00"
         endTime = "10:00:00"
-        classroom = "API-101"
+        classroom = "API-$runId"
     } | Out-Null
 
 $schedules = Invoke-Api -Name "query course schedules" -Method "GET" -Url "$BaseUrl/api/courses/$courseId/schedules" -Token $adminToken
 Assert-True (($schedules.data | Measure-Object).Count -ge 1) "Course schedule was not created."
 
+$retryIndex = 0
+$preAssigned = Invoke-Api -Name "precheck teacher assignment" -Method "GET" -Url "$TeacherServiceUrl/internal/courses/$courseId/teacher-assigned"
+while ($preAssigned.data.assigned -eq $true -and $retryIndex -lt 10) {
+    $retryIndex++
+    $course = Invoke-Api `
+        -Name "create fallback course $retryIndex" `
+        -Method "POST" `
+        -Url "$BaseUrl/api/courses" `
+        -Token $adminToken `
+        -Body @{
+            courseCode = "API-$runId-R$retryIndex"
+            courseName = "API Smoke Course $runId Retry $retryIndex"
+            credit = 3.0
+            capacity = 3
+            status = "OPEN"
+            description = "Created after stale assignment precheck"
+        }
+    $courseId = [int64]$course.data.courseId
+    Invoke-Api `
+        -Name "create fallback course schedule $retryIndex" `
+        -Method "POST" `
+        -Url "$BaseUrl/api/courses/$courseId/schedules" `
+        -Token $adminToken `
+        -Body @{
+            weekday = 6
+            startTime = "09:00:00"
+            endTime = "10:00:00"
+            classroom = "API-$runId-R$retryIndex"
+        } | Out-Null
+    $preAssigned = Invoke-Api -Name "precheck fallback teacher assignment $retryIndex" -Method "GET" -Url "$TeacherServiceUrl/internal/courses/$courseId/teacher-assigned"
+}
+Assert-True ($preAssigned.data.assigned -ne $true) "Could not find an unassigned test course after $retryIndex retries."
+
+$teacherUsername = "teacher$runId"
+$teacherPassword = "pass$runId"
 $teacher = Invoke-Api `
     -Name "create teacher" `
     -Method "POST" `
@@ -164,6 +199,8 @@ $teacher = Invoke-Api `
     -Token $adminToken `
     -Body @{
         teacherNo = "T$runId"
+        username = $teacherUsername
+        password = $teacherPassword
         name = "API Teacher $runId"
         title = "Lecturer"
         phone = "13900000000"
@@ -172,6 +209,16 @@ $teacher = Invoke-Api `
     }
 $teacherId = [int64]$teacher.data.teacherId
 Assert-True ($teacherId -gt 0) "Teacher id is invalid."
+
+$teacherLogin = Invoke-Api `
+    -Name "teacher login" `
+    -Method "POST" `
+    -Url "$BaseUrl/api/auth/login" `
+    -Body @{ username = $teacherUsername; password = $teacherPassword }
+$teacherToken = $teacherLogin.data.token
+Assert-True (-not [string]::IsNullOrWhiteSpace($teacherToken)) "Teacher token is empty."
+Assert-True ($teacherLogin.data.role -eq "TEACHER") "Teacher login role is invalid."
+Assert-True ([int64]$teacherLogin.data.relatedId -eq $teacherId) "Teacher login relatedId does not match created teacher id."
 
 Invoke-Api `
     -Name "update teacher" `
@@ -288,7 +335,14 @@ Assert-True (($timetable.data | Where-Object { $_.courseId -eq $courseId } | Mea
 $adminEnrollments = Invoke-Api -Name "admin enrollment records" -Method "GET" -Url "$BaseUrl/api/enrollments?courseId=$courseId&pageSize=100" -Token $adminToken
 Assert-True (($adminEnrollments.data.records | Where-Object { $_.enrollmentId -eq $enrollmentId } | Measure-Object).Count -ge 1) "Admin enrollment list does not contain smoke test enrollment."
 
+$teacherCourseStudents = Invoke-Api -Name "teacher course students" -Method "GET" -Url "$BaseUrl/api/enrollments/teachers/$teacherId/courses/$courseId/students" -Token $teacherToken
+Assert-True (($teacherCourseStudents.data | Where-Object { $_.studentId -eq $studentId } | Measure-Object).Count -ge 1) "Teacher course student list does not contain enrolled student."
+
 Invoke-Api -Name "student drop course" -Method "DELETE" -Url "$BaseUrl/api/enrollments/$enrollmentId" -Token $studentToken | Out-Null
+$afterDrop = Invoke-Api -Name "student enrollments after drop" -Method "GET" -Url "$BaseUrl/api/enrollments/students/$studentId" -Token $studentToken
+Assert-True (($afterDrop.data | Where-Object { $_.enrollmentId -eq $enrollmentId -and $_.status -eq "DROPPED" } | Measure-Object).Count -eq 1) "Dropped enrollment status was not found."
+
+Invoke-Api -Name "cancel teacher assignment" -Method "DELETE" -Url "$BaseUrl/api/teachers/$teacherId/courses/$courseId" -Token $adminToken | Out-Null
 
 Write-Host ""
 Write-Host "API smoke test completed successfully."

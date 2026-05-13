@@ -19,3 +19,7 @@ export function getStudentTimetable(studentId) {
 export function listEnrollments(params) {
   return request.get('/api/enrollments', { params })
 }
+
+export function listTeacherCourseStudents(teacherId, courseId) {
+  return request.get(`/api/enrollments/teachers/${teacherId}/courses/${courseId}/students`)
+}

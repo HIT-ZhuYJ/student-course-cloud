@@ -49,11 +49,15 @@ const navItems = computed(() => {
     ]
   }
   if (role.value === 'TEACHER') {
-    return [{ to: '/teacher/courses', label: '我的任课' }]
+    return [
+      { to: '/teacher/courses', label: '我的任课' },
+      { to: '/teacher/students', label: '选课学生' }
+    ]
   }
   return [
     { to: '/student/courses', label: '课程列表' },
-    { to: '/student/timetable', label: '我的课表' }
+    { to: '/student/timetable', label: '我的课表' },
+    { to: '/student/profile', label: '个人信息' }
   ]
 })
 

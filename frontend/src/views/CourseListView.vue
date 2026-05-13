@@ -3,7 +3,6 @@
     <div class="section-toolbar">
       <div>
         <h2>课程列表</h2>
-        <p class="muted">课程数据来自 Gateway 的 /api/courses，选课会调用 enrollment-service 完成容量、教师分配和时间冲突校验。</p>
       </div>
       <button class="secondary-button" type="button" @click="loadCourses()">刷新</button>
     </div>

@@ -27,4 +27,14 @@
         WHERE course_id = #{courseId}
         ORDER BY weekday ASC, start_time ASC
     </select>
+
+    <select id="findClassroomConflicts" resultMap="CourseScheduleResultMap">
+        SELECT schedule_id, course_id, weekday, start_time, end_time, classroom, create_time, update_time
+        FROM course_schedule
+        WHERE classroom = #{classroom}
+          AND weekday = #{weekday}
+          AND start_time &lt; #{endTime}
+          AND #{startTime} &lt; end_time
+        ORDER BY course_id ASC, start_time ASC
+    </select>
 </mapper>

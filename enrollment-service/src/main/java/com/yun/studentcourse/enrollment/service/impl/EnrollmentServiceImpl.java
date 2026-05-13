@@ -10,9 +10,12 @@ import com.yun.studentcourse.enrollment.client.TeacherClient;
 import com.yun.studentcourse.enrollment.client.dto.CourseCapacityResponse;
 import com.yun.studentcourse.enrollment.client.dto.CourseScheduleResponse;
 import com.yun.studentcourse.enrollment.client.dto.CourseTeacherAssignedResponse;
+import com.yun.studentcourse.enrollment.client.dto.StudentResponse;
 import com.yun.studentcourse.enrollment.client.dto.StudentStatusResponse;
+import com.yun.studentcourse.enrollment.client.dto.TeacherCourseAssignmentResponse;
 import com.yun.studentcourse.enrollment.dto.EnrollmentCreateRequest;
 import com.yun.studentcourse.enrollment.dto.EnrollmentResponse;
+import com.yun.studentcourse.enrollment.dto.TeacherCourseStudentResponse;
 import com.yun.studentcourse.enrollment.dto.TimetableResponse;
 import com.yun.studentcourse.enrollment.entity.Enrollment;
 import com.yun.studentcourse.enrollment.mapper.EnrollmentMapper;
@@ -128,6 +131,23 @@ public class EnrollmentServiceImpl implements EnrollmentService {
             }
         }
         return timetable;
+    }
+
+    @Override
+    public List<TeacherCourseStudentResponse> listTeacherCourseStudents(Long teacherId, Long courseId) {
+        List<TeacherCourseAssignmentResponse> assignments = requireRemoteData(
+                teacherClient.listTeacherCourses(teacherId),
+                "teacher course query failed"
+        );
+        boolean ownsCourse = assignments.stream()
+                .anyMatch(assignment -> courseId.equals(assignment.getCourseId()) && ACTIVE.equals(assignment.getStatus()));
+        if (!ownsCourse) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "teacher is not assigned to this course");
+        }
+        return enrollmentMapper.findActiveByCourseId(courseId)
+                .stream()
+                .map(this::toTeacherCourseStudentResponse)
+                .toList();
     }
 
     @Override
@@ -272,6 +292,24 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         response.setStartTime(schedule.getStartTime());
         response.setEndTime(schedule.getEndTime());
         response.setClassroom(schedule.getClassroom());
+        return response;
+    }
+
+    private TeacherCourseStudentResponse toTeacherCourseStudentResponse(Enrollment enrollment) {
+        StudentResponse student = requireRemoteData(
+                studentClient.getStudent(enrollment.getStudentId()),
+                "student detail query failed"
+        );
+        TeacherCourseStudentResponse response = new TeacherCourseStudentResponse();
+        response.setEnrollmentId(enrollment.getEnrollmentId());
+        response.setCourseId(enrollment.getCourseId());
+        response.setStudentId(enrollment.getStudentId());
+        response.setStudentNo(student.getStudentNo());
+        response.setStudentName(student.getName());
+        response.setMajor(student.getMajor());
+        response.setGrade(student.getGrade());
+        response.setEnrollmentStatus(enrollment.getStatus());
+        response.setEnrollmentTime(enrollment.getCreateTime());
         return response;
     }
 }

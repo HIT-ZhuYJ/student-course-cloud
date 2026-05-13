@@ -3,7 +3,6 @@
     <div class="section-toolbar">
       <div>
         <h2>学生管理</h2>
-        <p class="muted">查询学生列表和学生详情，数据来自 /api/students。</p>
       </div>
       <button class="secondary-button" type="button" @click="loadStudents">刷新</button>
     </div>
@@ -11,6 +10,11 @@
     <form class="filter-row" @submit.prevent="loadStudents">
       <input v-model.trim="keyword" placeholder="学号、姓名或专业" />
       <button class="secondary-button">查询</button>
+      <button class="secondary-button" type="button" @click="exportStudents">导出CSV</button>
+      <label class="file-button">
+        导入CSV
+        <input type="file" accept=".csv,text/csv" @change="importStudents" />
+      </label>
     </form>
 
     <p v-if="error" class="error-text">{{ error }}</p>
@@ -61,6 +65,7 @@
 
 <script setup>
 import { onMounted, ref } from 'vue'
+import { register } from '../api/auth'
 import { getStudent, listStudents } from '../api/student'
 
 const students = ref([])
@@ -88,5 +93,72 @@ async function showDetail(studentId) {
   } catch (err) {
     error.value = err.normalizedMessage || '学生详情加载失败'
   }
+}
+
+function exportStudents() {
+  downloadCsv('students.csv', [
+    ['studentId', 'studentNo', 'name', 'major', 'grade', 'phone', 'email', 'status'],
+    ...students.value.map((student) => [
+      student.studentId,
+      student.studentNo,
+      student.name,
+      student.major,
+      student.grade,
+      student.phone || '',
+      student.email || '',
+      student.status
+    ])
+  ])
+}
+
+async function importStudents(event) {
+  const file = event.target.files?.[0]
+  event.target.value = ''
+  if (!file) return
+  error.value = ''
+  try {
+    const rows = parseCsv(await file.text())
+    let count = 0
+    for (const row of rows) {
+      if (!row.studentNo || !row.name || !row.major || !row.grade || !row.username || !row.password) continue
+      await register({
+        studentNo: row.studentNo,
+        name: row.name,
+        major: row.major,
+        grade: row.grade,
+        phone: row.phone || '',
+        email: row.email || '',
+        username: row.username,
+        password: row.password
+      })
+      count += 1
+    }
+    await loadStudents()
+    error.value = ''
+    alert(`已导入 ${count} 名学生`)
+  } catch (err) {
+    error.value = err.normalizedMessage || err.message || '学生导入失败'
+  }
+}
+
+function parseCsv(text) {
+  const lines = text.trim().split(/\r?\n/).filter(Boolean)
+  if (lines.length < 2) return []
+  const headers = lines[0].split(',').map((item) => item.trim())
+  return lines.slice(1).map((line) => {
+    const values = line.split(',').map((item) => item.trim())
+    return Object.fromEntries(headers.map((header, index) => [header, values[index] || '']))
+  })
+}
+
+function downloadCsv(filename, rows) {
+  const csv = rows.map((row) => row.map((value) => `"${String(value ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')
+  const blob = new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(url)
 }
 </script>

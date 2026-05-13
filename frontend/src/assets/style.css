@@ -17,7 +17,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -208,7 +209,8 @@ label {
   font-weight: 700;
 }
 
-input {
+input,
+select {
   width: 100%;
   min-height: 40px;
   padding: 8px 11px;
@@ -222,7 +224,8 @@ input::placeholder {
   color: #9ca3af;
 }
 
-input:focus {
+input:focus,
+select:focus {
   outline: 3px solid #dbeafe;
   border-color: #60a5fa;
 }
@@ -300,14 +303,16 @@ input:focus {
 }
 
 .secondary-button,
-.small-button {
+.small-button,
+.file-button {
   color: #1d4ed8;
   background: #ffffff;
   border-color: #bfdbfe;
 }
 
 .secondary-button:hover,
-.small-button:hover {
+.small-button:hover,
+.file-button:hover {
   background: #eff6ff;
 }
 
@@ -320,6 +325,22 @@ input:focus {
   min-height: 32px;
   padding: 0 11px;
   font-size: 13px;
+}
+
+.file-button {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  margin-top: 0;
+  padding: 0 16px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.file-button input {
+  display: none;
 }
 
 .small-button.warn {

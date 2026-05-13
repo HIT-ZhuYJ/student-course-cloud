@@ -4,7 +4,9 @@ import RegisterView from '../views/RegisterView.vue'
 import StudentLayout from '../views/StudentLayout.vue'
 import CourseListView from '../views/CourseListView.vue'
 import MyTimetableView from '../views/MyTimetableView.vue'
+import StudentProfileView from '../views/StudentProfileView.vue'
 import TeacherCoursesView from '../views/TeacherCoursesView.vue'
+import TeacherStudentsView from '../views/TeacherStudentsView.vue'
 import AdminLayout from '../views/AdminLayout.vue'
 import AdminCourseView from '../views/AdminCourseView.vue'
 import AdminTeacherView from '../views/AdminTeacherView.vue'
@@ -23,10 +25,12 @@ const routes = [
     redirect: '/student/courses',
     children: [
       { path: 'courses', component: CourseListView, meta: { roles: ['STUDENT'] } },
-      { path: 'timetable', component: MyTimetableView, meta: { roles: ['STUDENT'] } }
+      { path: 'timetable', component: MyTimetableView, meta: { roles: ['STUDENT'] } },
+      { path: 'profile', component: StudentProfileView, meta: { roles: ['STUDENT'] } }
     ]
   },
   { path: '/teacher/courses', component: TeacherCoursesView, meta: { roles: ['TEACHER'] } },
+  { path: '/teacher/students', component: TeacherStudentsView, meta: { roles: ['TEACHER'] } },
   {
     path: '/admin',
     component: AdminLayout,

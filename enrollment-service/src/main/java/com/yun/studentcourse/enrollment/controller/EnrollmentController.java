@@ -6,6 +6,7 @@ import com.yun.studentcourse.common.ErrorCode;
 import com.yun.studentcourse.common.dto.PageResult;
 import com.yun.studentcourse.enrollment.dto.EnrollmentCreateRequest;
 import com.yun.studentcourse.enrollment.dto.EnrollmentResponse;
+import com.yun.studentcourse.enrollment.dto.TeacherCourseStudentResponse;
 import com.yun.studentcourse.enrollment.dto.TimetableResponse;
 import com.yun.studentcourse.enrollment.service.EnrollmentService;
 import jakarta.validation.Valid;
@@ -25,6 +26,7 @@ public class EnrollmentController {
 
     private static final String ROLE_ADMIN = "ADMIN";
     private static final String ROLE_STUDENT = "STUDENT";
+    private static final String ROLE_TEACHER = "TEACHER";
 
     private final EnrollmentService enrollmentService;
 
@@ -71,6 +73,17 @@ public class EnrollmentController {
         return Result.success(enrollmentService.getStudentTimetable(studentId));
     }
 
+    @GetMapping("/enrollments/teachers/{teacherId}/courses/{courseId}/students")
+    public Result<List<TeacherCourseStudentResponse>> listTeacherCourseStudents(
+            @RequestHeader("X-Role") String role,
+            @RequestHeader(value = "X-Related-Id", required = false) Long relatedId,
+            @PathVariable Long teacherId,
+            @PathVariable Long courseId
+    ) {
+        requireTeacherOwnerOrAdmin(role, relatedId, teacherId);
+        return Result.success(enrollmentService.listTeacherCourseStudents(teacherId, courseId));
+    }
+
     @GetMapping("/enrollments")
     public Result<PageResult<EnrollmentResponse>> listEnrollments(
             @RequestParam(defaultValue = "1") int pageNo,
@@ -90,6 +103,16 @@ public class EnrollmentController {
             return;
         }
         throw new BusinessException(ErrorCode.FORBIDDEN, "students can only operate their own enrollments");
+    }
+
+    private void requireTeacherOwnerOrAdmin(String role, Long relatedId, Long targetTeacherId) {
+        if (isAdmin(role)) {
+            return;
+        }
+        if (ROLE_TEACHER.equals(role) && relatedId != null && relatedId.equals(targetTeacherId)) {
+            return;
+        }
+        throw new BusinessException(ErrorCode.FORBIDDEN, "teachers can only view their own course students");
     }
 
     private Long requesterStudentId(String role, Long relatedId) {

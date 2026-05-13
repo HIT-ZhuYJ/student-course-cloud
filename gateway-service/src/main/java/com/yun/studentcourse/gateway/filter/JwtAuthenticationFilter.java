@@ -135,7 +135,7 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
 
     private boolean hasEnrollmentPermission(HttpMethod method, String path, UserContext userContext) {
         if (!RoleEnum.STUDENT.equals(userContext.getRole())) {
-            return false;
+            return hasTeacherEnrollmentPermission(method, path, userContext);
         }
         if (HttpMethod.POST.equals(method) && "/api/enrollments".equals(path)) {
             return true;
@@ -148,6 +148,23 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
             return studentId != null && studentId.equals(userContext.getRelatedId());
         }
         return false;
+    }
+
+    private boolean hasTeacherEnrollmentPermission(HttpMethod method, String path, UserContext userContext) {
+        if (!RoleEnum.TEACHER.equals(userContext.getRole()) || !HttpMethod.GET.equals(method)) {
+            return false;
+        }
+        String prefix = "/api/enrollments/teachers/";
+        if (!path.startsWith(prefix) || !path.endsWith("/students")) {
+            return false;
+        }
+        String tail = path.substring(prefix.length());
+        int slashIndex = tail.indexOf('/');
+        if (slashIndex < 0) {
+            return false;
+        }
+        Long teacherId = parseLong(tail.substring(0, slashIndex));
+        return teacherId != null && teacherId.equals(userContext.getRelatedId());
     }
 
     private Long pathId(String path, String prefix) {

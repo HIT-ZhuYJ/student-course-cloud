@@ -9,8 +9,7 @@
 - course-service
 - teacher-service
 - enrollment-service
-- Vue 前端
-- Nginx 统一入口
+- Nginx 统一入口（镜像内直接包含 Vue 前端静态资源）
 - Prometheus
 - Grafana
 - Elasticsearch
@@ -62,9 +61,9 @@ docker/maven/settings.xml
 首次启动会做这些事情：
 
 1. 构建每个后端微服务镜像。
-2. 构建前端 Vue 静态文件镜像。
+2. 构建 Nginx 镜像，并在镜像构建阶段生成 Vue 前端静态文件。
 3. 启动 MySQL，并自动执行 `scripts/sql/` 下的初始化 SQL。
-4. 启动 Eureka、各业务服务、Gateway、Frontend、Nginx。
+4. 启动 Eureka、各业务服务、Gateway、Nginx。
 5. 启动 Prometheus/Grafana/ELK。
 
 ## 3. 访问地址
@@ -90,7 +89,7 @@ Docker 环境中的请求链路：
 Browser
   -> http://localhost
   -> nginx:80
-     -> /          转发到 frontend:80
+     -> /          直接返回镜像内的 Vue 静态资源
      -> /api/**    转发到 gateway-service:8080
   -> gateway-service
   -> lb://student-service / course-service / teacher-service / enrollment-service

@@ -3,10 +3,25 @@
     <div class="section-toolbar">
       <div>
         <h2>课程管理</h2>
-        <p class="muted">维护课程基础信息和上课时间，所有请求通过 Gateway 转发到 course-service。</p>
       </div>
       <button class="secondary-button" type="button" @click="loadCourses">刷新</button>
     </div>
+
+    <form class="filter-row" @submit.prevent="loadCourses">
+      <input v-model.trim="filters.keyword" placeholder="课程编码或名称" />
+      <select v-model="filters.status">
+        <option value="">全部状态</option>
+        <option value="OPEN">OPEN</option>
+        <option value="CLOSED">CLOSED</option>
+        <option value="DISABLED">DISABLED</option>
+      </select>
+      <button class="secondary-button">查询</button>
+      <button class="secondary-button" type="button" @click="exportCourses">导出CSV</button>
+      <label class="file-button">
+        导入CSV
+        <input type="file" accept=".csv,text/csv" @change="importCourses" />
+      </label>
+    </form>
 
     <div class="panel-grid two">
       <form class="form-panel" @submit.prevent="saveCourse">
@@ -105,6 +120,7 @@ const savingSchedule = ref(false)
 const error = ref('')
 const message = ref('')
 
+const filters = reactive({ keyword: '', status: '' })
 const courseForm = reactive({ courseCode: '', courseName: '', credit: 3, capacity: 30, status: 'OPEN', description: '' })
 const scheduleForm = reactive({ courseId: null, weekday: 1, startTime: '08:00:00', endTime: '09:40:00', classroom: '' })
 
@@ -113,10 +129,59 @@ onMounted(loadCourses)
 async function loadCourses() {
   error.value = ''
   try {
-    const res = await listCourses({ pageNo: 1, pageSize: 100 })
+    const res = await listCourses({
+      pageNo: 1,
+      pageSize: 100,
+      keyword: filters.keyword || undefined,
+      status: filters.status || undefined
+    })
     courses.value = res.data?.records || []
   } catch (err) {
     error.value = err.normalizedMessage || '课程加载失败'
+  }
+}
+
+function exportCourses() {
+  downloadCsv('courses.csv', [
+    ['courseId', 'courseCode', 'courseName', 'credit', 'capacity', 'selectedCount', 'status', 'description'],
+    ...courses.value.map((course) => [
+      course.courseId,
+      course.courseCode,
+      course.courseName,
+      course.credit,
+      course.capacity,
+      course.selectedCount,
+      course.status,
+      course.description || ''
+    ])
+  ])
+}
+
+async function importCourses(event) {
+  const file = event.target.files?.[0]
+  event.target.value = ''
+  if (!file) return
+  error.value = ''
+  message.value = ''
+  try {
+    const rows = parseCsv(await file.text())
+    let count = 0
+    for (const row of rows) {
+      if (!row.courseCode || !row.courseName) continue
+      await createCourse({
+        courseCode: row.courseCode,
+        courseName: row.courseName,
+        credit: Number(row.credit || 3),
+        capacity: Number(row.capacity || 30),
+        status: row.status || 'OPEN',
+        description: row.description || ''
+      })
+      count += 1
+    }
+    message.value = `已导入 ${count} 门课程`
+    await loadCourses()
+  } catch (err) {
+    error.value = err.normalizedMessage || err.message || '课程导入失败'
   }
 }
 
@@ -217,5 +282,26 @@ async function showSchedules(courseId) {
 
 function normalizeTime(value) {
   return value.length === 5 ? `${value}:00` : value
+}
+
+function parseCsv(text) {
+  const lines = text.trim().split(/\r?\n/).filter(Boolean)
+  if (lines.length < 2) return []
+  const headers = lines[0].split(',').map((item) => item.trim())
+  return lines.slice(1).map((line) => {
+    const values = line.split(',').map((item) => item.trim())
+    return Object.fromEntries(headers.map((header, index) => [header, values[index] || '']))
+  })
+}
+
+function downloadCsv(filename, rows) {
+  const csv = rows.map((row) => row.map((value) => `"${String(value ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')
+  const blob = new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(url)
 }
 </script>
