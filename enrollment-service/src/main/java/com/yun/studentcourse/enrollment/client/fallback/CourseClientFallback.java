@@ -4,6 +4,7 @@ import com.yun.studentcourse.common.ErrorCode;
 import com.yun.studentcourse.common.Result;
 import com.yun.studentcourse.enrollment.client.CourseClient;
 import com.yun.studentcourse.enrollment.client.dto.CourseCapacityResponse;
+import com.yun.studentcourse.enrollment.client.dto.CourseResponse;
 import com.yun.studentcourse.enrollment.client.dto.CourseScheduleResponse;
 import org.springframework.stereotype.Component;
 
@@ -21,6 +22,11 @@ public class CourseClientFallback implements CourseClient {
 
     @Override
     public Result<List<CourseScheduleResponse>> getSchedule(Long courseId) {
+        return Result.fail(ErrorCode.SERVICE_UNAVAILABLE, MESSAGE);
+    }
+
+    @Override
+    public Result<CourseResponse> getCourse(Long courseId) {
         return Result.fail(ErrorCode.SERVICE_UNAVAILABLE, MESSAGE);
     }
 

@@ -1,34 +1,28 @@
-package com.yun.studentcourse.course.dto;
-
-import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+package com.yun.studentcourse.enrollment.client.dto;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
-public class CourseCreateRequest {
+public class CourseResponse {
 
-    @NotBlank(message = "courseCode is required")
+    private Long courseId;
     private String courseCode;
-
-    @NotBlank(message = "courseName is required")
     private String courseName;
-
-    @NotNull(message = "credit is required")
-    @DecimalMin(value = "0.5", message = "credit must be positive")
     private BigDecimal credit;
-
-    @Min(value = 1, message = "capacity must be at least 1")
     private int capacity;
-
-    private String status = "OPEN";
+    private int selectedCount;
+    private String status;
     private String description;
+    private LocalDateTime createTime;
+    private LocalDateTime updateTime;
 
-    @Valid
-    @NotNull(message = "schedule is required")
-    private CourseScheduleRequest schedule;
+    public Long getCourseId() {
+        return courseId;
+    }
+
+    public void setCourseId(Long courseId) {
+        this.courseId = courseId;
+    }
 
     public String getCourseCode() {
         return courseCode;
@@ -62,6 +56,14 @@ public class CourseCreateRequest {
         this.capacity = capacity;
     }
 
+    public int getSelectedCount() {
+        return selectedCount;
+    }
+
+    public void setSelectedCount(int selectedCount) {
+        this.selectedCount = selectedCount;
+    }
+
     public String getStatus() {
         return status;
     }
@@ -78,11 +80,19 @@ public class CourseCreateRequest {
         this.description = description;
     }
 
-    public CourseScheduleRequest getSchedule() {
-        return schedule;
+    public LocalDateTime getCreateTime() {
+        return createTime;
     }
 
-    public void setSchedule(CourseScheduleRequest schedule) {
-        this.schedule = schedule;
+    public void setCreateTime(LocalDateTime createTime) {
+        this.createTime = createTime;
+    }
+
+    public LocalDateTime getUpdateTime() {
+        return updateTime;
+    }
+
+    public void setUpdateTime(LocalDateTime updateTime) {
+        this.updateTime = updateTime;
     }
 }

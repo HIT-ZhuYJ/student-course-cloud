@@ -15,6 +15,8 @@ public interface CourseScheduleMapper {
 
     List<CourseSchedule> findClassroomConflicts(
             @Param("classroom") String classroom,
+            @Param("startWeek") int startWeek,
+            @Param("endWeek") int endWeek,
             @Param("weekday") int weekday,
             @Param("startTime") java.time.LocalTime startTime,
             @Param("endTime") java.time.LocalTime endTime

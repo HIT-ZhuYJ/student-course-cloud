@@ -269,8 +269,30 @@ public class TeacherServiceImpl implements TeacherService {
 
     private boolean isScheduleConflict(CourseScheduleResponse left, CourseScheduleResponse right) {
         return left.getWeekday() == right.getWeekday()
+                && weeksOverlap(left, right)
                 && left.getStartTime().isBefore(right.getEndTime())
                 && right.getStartTime().isBefore(left.getEndTime());
+    }
+
+    private boolean weeksOverlap(CourseScheduleResponse left, CourseScheduleResponse right) {
+        int start = Math.max(left.getStartWeek(), right.getStartWeek());
+        int end = Math.min(left.getEndWeek(), right.getEndWeek());
+        if (start > end) {
+            return false;
+        }
+        for (int week = start; week <= end; week++) {
+            if (matchesWeekType(week, left.getWeekType()) && matchesWeekType(week, right.getWeekType())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean matchesWeekType(int weekNo, String weekType) {
+        String normalized = StringUtils.hasText(weekType) ? weekType.trim().toUpperCase() : "ALL";
+        return "ALL".equals(normalized)
+                || ("ODD".equals(normalized) && weekNo % 2 == 1)
+                || ("EVEN".equals(normalized) && weekNo % 2 == 0);
     }
 
     private <T> T requireRemoteData(Result<T> result, String defaultMessage) {

@@ -8,6 +8,7 @@ import com.yun.studentcourse.enrollment.client.CourseClient;
 import com.yun.studentcourse.enrollment.client.StudentClient;
 import com.yun.studentcourse.enrollment.client.TeacherClient;
 import com.yun.studentcourse.enrollment.client.dto.CourseCapacityResponse;
+import com.yun.studentcourse.enrollment.client.dto.CourseResponse;
 import com.yun.studentcourse.enrollment.client.dto.CourseScheduleResponse;
 import com.yun.studentcourse.enrollment.client.dto.CourseTeacherAssignedResponse;
 import com.yun.studentcourse.enrollment.client.dto.StudentResponse;
@@ -122,12 +123,18 @@ public class EnrollmentServiceImpl implements EnrollmentService {
     }
 
     @Override
-    public List<TimetableResponse> getStudentTimetable(Long studentId) {
+    public List<TimetableResponse> getStudentTimetable(Long studentId, Integer weekNo) {
         validateStudent(studentId);
+        if (weekNo != null && (weekNo < 1 || weekNo > 30)) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "weekNo must be between 1 and 30");
+        }
         List<TimetableResponse> timetable = new ArrayList<>();
         for (Enrollment enrollment : enrollmentMapper.findActiveByStudentId(studentId)) {
+            CourseResponse course = getCourse(enrollment.getCourseId());
             for (CourseScheduleResponse schedule : getCourseSchedules(enrollment.getCourseId())) {
-                timetable.add(toTimetableResponse(enrollment, schedule));
+                if (weekNo == null || isActiveInWeek(schedule, weekNo)) {
+                    timetable.add(toTimetableResponse(enrollment, course, schedule));
+                }
             }
         }
         return timetable;
@@ -234,8 +241,40 @@ public class EnrollmentServiceImpl implements EnrollmentService {
 
     private boolean isConflict(CourseScheduleResponse left, CourseScheduleResponse right) {
         return left.getWeekday() == right.getWeekday()
+                && weeksOverlap(left, right)
                 && left.getStartTime().isBefore(right.getEndTime())
                 && right.getStartTime().isBefore(left.getEndTime());
+    }
+
+    private CourseResponse getCourse(Long courseId) {
+        return requireRemoteData(courseClient.getCourse(courseId), "course detail query failed");
+    }
+
+    private boolean weeksOverlap(CourseScheduleResponse left, CourseScheduleResponse right) {
+        int start = Math.max(left.getStartWeek(), right.getStartWeek());
+        int end = Math.min(left.getEndWeek(), right.getEndWeek());
+        if (start > end) {
+            return false;
+        }
+        for (int week = start; week <= end; week++) {
+            if (matchesWeekType(week, left.getWeekType()) && matchesWeekType(week, right.getWeekType())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isActiveInWeek(CourseScheduleResponse schedule, int weekNo) {
+        return weekNo >= schedule.getStartWeek()
+                && weekNo <= schedule.getEndWeek()
+                && matchesWeekType(weekNo, schedule.getWeekType());
+    }
+
+    private boolean matchesWeekType(int weekNo, String weekType) {
+        String normalized = StringUtils.hasText(weekType) ? weekType.trim().toUpperCase() : "ALL";
+        return "ALL".equals(normalized)
+                || ("ODD".equals(normalized) && weekNo % 2 == 1)
+                || ("EVEN".equals(normalized) && weekNo % 2 == 0);
     }
 
     private Enrollment requireEnrollment(Long enrollmentId) {
@@ -282,13 +321,20 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         return response;
     }
 
-    private TimetableResponse toTimetableResponse(Enrollment enrollment, CourseScheduleResponse schedule) {
+    private TimetableResponse toTimetableResponse(Enrollment enrollment, CourseResponse course, CourseScheduleResponse schedule) {
         TimetableResponse response = new TimetableResponse();
         response.setEnrollmentId(enrollment.getEnrollmentId());
         response.setStudentId(enrollment.getStudentId());
         response.setCourseId(enrollment.getCourseId());
+        response.setCourseCode(course.getCourseCode());
+        response.setCourseName(course.getCourseName());
         response.setScheduleId(schedule.getScheduleId());
+        response.setStartWeek(schedule.getStartWeek());
+        response.setEndWeek(schedule.getEndWeek());
+        response.setWeekType(schedule.getWeekType());
         response.setWeekday(schedule.getWeekday());
+        response.setStartSection(schedule.getStartSection());
+        response.setEndSection(schedule.getEndSection());
         response.setStartTime(schedule.getStartTime());
         response.setEndTime(schedule.getEndTime());
         response.setClassroom(schedule.getClassroom());

@@ -1,0 +1,6 @@
+courseCode,courseName,credit,capacity,status,description,startWeek,endWeek,weekType,weekday,startSection,endSection,startTime,endTime,classroom
+CS101,Software Construction CSV Old,3.0,50,OPEN,Old update row for existing course,1,16,ALL,1,1,2,08:00:00,09:45:00,A101
+CS101,Software Construction CSV Updated,3.5,55,OPEN,Final update row for existing course,1,16,ALL,1,1,2,08:00:00,09:45:00,A101
+CSV-CS-9001,CSV Course Draft,2.0,30,OPEN,Draft row that should be overwritten,1,8,ALL,6,1,2,08:00:00,09:45:00,CSV-A101
+CSV-CS-9001,CSV Course Final,2.5,35,OPEN,Final row that should be imported,2,12,ALL,6,3,4,10:00:00,11:45:00,CSV-A102
+CSV-CS-9002,CSV Course Evening,1.5,25,OPEN,Second imported test course,3,10,EVEN,7,9,10,18:30:00,20:15:00,CSV-B201

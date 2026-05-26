@@ -9,7 +9,12 @@ public class CourseScheduleResponse {
 
     private Long scheduleId;
     private Long courseId;
+    private int startWeek;
+    private int endWeek;
+    private String weekType;
     private int weekday;
+    private int startSection;
+    private int endSection;
 
     @JsonFormat(pattern = "HH:mm:ss")
     private LocalTime startTime;
@@ -37,12 +42,52 @@ public class CourseScheduleResponse {
         this.courseId = courseId;
     }
 
+    public int getStartWeek() {
+        return startWeek;
+    }
+
+    public void setStartWeek(int startWeek) {
+        this.startWeek = startWeek;
+    }
+
+    public int getEndWeek() {
+        return endWeek;
+    }
+
+    public void setEndWeek(int endWeek) {
+        this.endWeek = endWeek;
+    }
+
+    public String getWeekType() {
+        return weekType;
+    }
+
+    public void setWeekType(String weekType) {
+        this.weekType = weekType;
+    }
+
     public int getWeekday() {
         return weekday;
     }
 
     public void setWeekday(int weekday) {
         this.weekday = weekday;
+    }
+
+    public int getStartSection() {
+        return startSection;
+    }
+
+    public void setStartSection(int startSection) {
+        this.startSection = startSection;
+    }
+
+    public int getEndSection() {
+        return endSection;
+    }
+
+    public void setEndSection(int endSection) {
+        this.endSection = endSection;
     }
 
     public LocalTime getStartTime() {

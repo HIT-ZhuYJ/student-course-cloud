@@ -324,7 +324,18 @@ X-Related-Id
   "credit": 3.0,
   "capacity": 60,
   "status": "OPEN",
-  "description": "Java 基础课程"
+  "description": "Java 基础课程",
+  "schedule": {
+    "startWeek": 1,
+    "endWeek": 16,
+    "weekType": "ALL",
+    "weekday": 1,
+    "startSection": 1,
+    "endSection": 2,
+    "startTime": "08:00:00",
+    "endTime": "09:45:00",
+    "classroom": "A101"
+  }
 }
 ```
 
@@ -352,7 +363,7 @@ X-Related-Id
 
 错误情况：
 
-- `400`：课程编码、课程名称、学分或容量不合法。
+- `400` / `422`：课程编码、课程名称、学分、容量或首个课程时间不合法。新增课程时 `schedule` 必填。
 - `401`：未登录或 token 无效。
 - `403`：非管理员访问。
 - `409`：课程编码已存在。
@@ -1266,3 +1277,46 @@ X-Related-Id
 | 内部 | `POST` | `/internal/courses/{courseId}/increase-selected-count` | 增加已选人数 |
 | 内部 | `POST` | `/internal/courses/{courseId}/decrease-selected-count` | 减少已选人数 |
 | 内部 | `GET` | `/internal/courses/{courseId}/teacher-assigned` | 校验教师分配 |
+
+## 11. 课程周次与课表补充
+
+课程时间现在按学校课表常用格式保存：
+
+```json
+{
+  "startWeek": 1,
+  "endWeek": 16,
+  "weekType": "ALL",
+  "weekday": 1,
+  "startSection": 1,
+  "endSection": 2,
+  "startTime": "08:00:00",
+  "endTime": "09:45:00",
+  "classroom": "A101"
+}
+```
+
+字段说明：
+
+| 字段 | 说明 |
+|---|---|
+| `startWeek` / `endWeek` | 起止教学周，当前限制为 1-30 |
+| `weekType` | `ALL` 每周，`ODD` 单周，`EVEN` 双周 |
+| `weekday` | 星期，1-7 分别表示周一到周日 |
+| `startSection` / `endSection` | 起止节次，当前限制为 1-12 |
+| `startTime` / `endTime` | 实际上课起止时间 |
+| `classroom` | 教室 |
+
+学生课表接口仍为：
+
+```text
+GET /api/enrollments/students/{studentId}/timetable
+```
+
+不传 `weekNo` 时返回学生总课表；传入 `weekNo` 时返回指定教学周课表：
+
+```text
+GET /api/enrollments/students/{studentId}/timetable?weekNo=6
+```
+
+响应中会包含课程名称、课程编码、周次、单双周、星期、节次、时间和教室，供前端渲染总课表和周课表。

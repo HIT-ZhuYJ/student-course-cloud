@@ -1,0 +1,6 @@
+teacherNo,username,password,name,title,phone,email,status
+T2026001,ZhangWeiUnused,teacher123,Zhang Wei CSV Old,Professor,13910001001,zhang-old@example.com,ACTIVE
+T2026001,ZhangWeiUnused,teacher123,Zhang Wei CSV Updated,Senior Professor,13910001002,zhang-updated@example.com,ACTIVE
+TCSV9001,teacher_csv_9001,teacher123,Grace Import Draft,Lecturer,13990001001,grace-draft@example.com,ACTIVE
+TCSV9001,teacher_csv_9001,teacher123,Grace Import Final,Associate Professor,13990001002,grace-final@example.com,ACTIVE
+TCSV9002,teacher_csv_9002,teacher123,Henry Import,Lecturer,13990002001,henry-import@example.com,ACTIVE

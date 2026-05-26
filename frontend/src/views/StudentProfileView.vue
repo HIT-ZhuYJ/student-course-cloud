@@ -35,9 +35,11 @@ const message = ref('')
 
 onMounted(loadProfile)
 
-async function loadProfile() {
+async function loadProfile(options = {}) {
   error.value = ''
-  message.value = ''
+  if (!options.keepMessage) {
+    message.value = ''
+  }
   try {
     const studentId = Number(localStorage.getItem('relatedId'))
     const res = await getStudent(studentId)
@@ -70,7 +72,7 @@ async function saveProfile() {
       status: form.status
     })
     message.value = '个人信息已更新'
-    await loadProfile()
+    await loadProfile({ keepMessage: true })
   } catch (err) {
     error.value = err.normalizedMessage || '个人信息保存失败'
   } finally {

@@ -10,12 +10,17 @@
     <form class="filter-row" @submit.prevent="loadEnrollments">
       <input v-model.number="filters.studentId" type="number" min="1" placeholder="学生ID" />
       <input v-model.number="filters.courseId" type="number" min="1" placeholder="课程ID" />
-      <input v-model.trim="filters.status" placeholder="ACTIVE / DROPPED" />
+      <select v-model="filters.status">
+        <option value="">全部状态</option>
+        <option value="ACTIVE">ACTIVE</option>
+        <option value="DROPPED">DROPPED</option>
+      </select>
       <button class="secondary-button">查询</button>
       <button class="secondary-button" type="button" @click="exportEnrollments">导出CSV</button>
     </form>
 
     <p v-if="error" class="error-text">{{ error }}</p>
+    <p v-if="message" class="success-text">{{ message }}</p>
 
     <div class="table-card">
       <table>
@@ -48,15 +53,18 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import { listEnrollments } from '../api/enrollment'
+import { downloadCsv } from '../utils/csv'
 
 const enrollments = ref([])
 const error = ref('')
+const message = ref('')
 const filters = reactive({ studentId: null, courseId: null, status: '' })
 
 onMounted(loadEnrollments)
 
 async function loadEnrollments() {
   error.value = ''
+  message.value = ''
   try {
     const res = await listEnrollments({
       pageNo: 1,
@@ -76,6 +84,12 @@ function formatTime(value) {
 }
 
 function exportEnrollments() {
+  error.value = ''
+  message.value = ''
+  if (!enrollments.value.length) {
+    error.value = '当前没有可导出的选课记录'
+    return
+  }
   downloadCsv('enrollments.csv', [
     ['enrollmentId', 'studentId', 'courseId', 'status', 'createTime', 'updateTime'],
     ...enrollments.value.map((item) => [
@@ -87,16 +101,6 @@ function exportEnrollments() {
       formatTime(item.updateTime)
     ])
   ])
-}
-
-function downloadCsv(filename, rows) {
-  const csv = rows.map((row) => row.map((value) => `"${String(value ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')
-  const blob = new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = filename
-  link.click()
-  URL.revokeObjectURL(url)
+  message.value = '选课记录 CSV 已导出'
 }
 </script>

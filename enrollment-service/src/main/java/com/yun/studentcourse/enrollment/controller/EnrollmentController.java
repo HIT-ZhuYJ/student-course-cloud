@@ -67,10 +67,11 @@ public class EnrollmentController {
     public Result<List<TimetableResponse>> getStudentTimetable(
             @RequestHeader("X-Role") String role,
             @RequestHeader(value = "X-Related-Id", required = false) Long relatedId,
-            @PathVariable Long studentId
+            @PathVariable Long studentId,
+            @RequestParam(required = false) Integer weekNo
     ) {
         requireStudentOwnerOrAdmin(role, relatedId, studentId);
-        return Result.success(enrollmentService.getStudentTimetable(studentId));
+        return Result.success(enrollmentService.getStudentTimetable(studentId, weekNo));
     }
 
     @GetMapping("/enrollments/teachers/{teacherId}/courses/{courseId}/students")

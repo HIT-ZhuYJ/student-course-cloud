@@ -41,7 +41,9 @@ function Invoke-Api {
         [object]$Body = $null,
         [string]$Token = "",
         [int]$ExpectedHttpStatus = 200,
-        [Nullable[int]]$ExpectedResultCode = 200
+        [Nullable[int]]$ExpectedResultCode = 200,
+        [int]$MaxAttempts = 6,
+        [int]$RetryDelaySeconds = 5
     )
 
     $headers = @{}
@@ -61,16 +63,27 @@ function Invoke-Api {
         $params.Body = New-TestBody $Body
     }
 
-    try {
-        $response = Invoke-WebRequest @params
-        $status = [int]$response.StatusCode
-        $payload = $null
-        if (-not [string]::IsNullOrWhiteSpace($response.Content)) {
-            $payload = $response.Content | ConvertFrom-Json
+    $status = 0
+    $payload = $null
+    for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+        try {
+            $response = Invoke-WebRequest @params
+            $status = [int]$response.StatusCode
+            $payload = $null
+            if (-not [string]::IsNullOrWhiteSpace($response.Content)) {
+                $payload = $response.Content | ConvertFrom-Json
+            }
+        } catch {
+            $status = [int]$_.Exception.Response.StatusCode
+            $payload = Read-ErrorBody $_.Exception.Response
         }
-    } catch {
-        $status = [int]$_.Exception.Response.StatusCode
-        $payload = Read-ErrorBody $_.Exception.Response
+
+        if ($status -ne 503 -or $ExpectedHttpStatus -eq 503 -or $attempt -eq $MaxAttempts) {
+            break
+        }
+
+        Write-Host "[WAIT] $Name returned 503, retrying in $RetryDelaySeconds seconds ($attempt/$MaxAttempts)"
+        Start-Sleep -Seconds $RetryDelaySeconds
     }
 
     if ($status -ne $ExpectedHttpStatus) {
@@ -125,6 +138,17 @@ $course = Invoke-Api `
         capacity = 2
         status = "OPEN"
         description = "Created by scripts/win/api-smoke-test.ps1"
+        schedule = @{
+            startWeek = 1
+            endWeek = 16
+            weekType = "ALL"
+            weekday = 6
+            startSection = 3
+            endSection = 4
+            startTime = "09:00:00"
+            endTime = "10:00:00"
+            classroom = "API-$runId"
+        }
     }
 $courseId = [int64]$course.data.courseId
 Assert-True ($courseId -gt 0) "Course id is invalid."
@@ -148,10 +172,15 @@ Invoke-Api `
     -Url "$BaseUrl/api/courses/$courseId/schedules" `
     -Token $adminToken `
     -Body @{
-        weekday = 6
-        startTime = "09:00:00"
-        endTime = "10:00:00"
-        classroom = "API-$runId"
+        startWeek = 1
+        endWeek = 16
+        weekType = "ALL"
+        weekday = 7
+        startSection = 5
+        endSection = 6
+        startTime = "13:45:00"
+        endTime = "15:30:00"
+        classroom = "API-$runId-EXTRA"
     } | Out-Null
 
 $schedules = Invoke-Api -Name "query course schedules" -Method "GET" -Url "$BaseUrl/api/courses/$courseId/schedules" -Token $adminToken
@@ -173,6 +202,17 @@ while ($preAssigned.data.assigned -eq $true -and $retryIndex -lt 10) {
             capacity = 3
             status = "OPEN"
             description = "Created after stale assignment precheck"
+            schedule = @{
+                startWeek = 1
+                endWeek = 16
+                weekType = "ALL"
+                weekday = 6
+                startSection = 3
+                endSection = 4
+                startTime = "09:00:00"
+                endTime = "10:00:00"
+                classroom = "API-$runId-R$retryIndex"
+            }
         }
     $courseId = [int64]$course.data.courseId
     Invoke-Api `
@@ -181,10 +221,15 @@ while ($preAssigned.data.assigned -eq $true -and $retryIndex -lt 10) {
         -Url "$BaseUrl/api/courses/$courseId/schedules" `
         -Token $adminToken `
         -Body @{
-            weekday = 6
-            startTime = "09:00:00"
-            endTime = "10:00:00"
-            classroom = "API-$runId-R$retryIndex"
+            startWeek = 1
+            endWeek = 16
+            weekType = "ALL"
+            weekday = 7
+            startSection = 5
+            endSection = 6
+            startTime = "13:45:00"
+            endTime = "15:30:00"
+            classroom = "API-$runId-R$retryIndex-EXTRA"
         } | Out-Null
     $preAssigned = Invoke-Api -Name "precheck fallback teacher assignment $retryIndex" -Method "GET" -Url "$TeacherServiceUrl/internal/courses/$courseId/teacher-assigned"
 }
@@ -297,6 +342,17 @@ Invoke-Api `
         capacity = 1
         status = "OPEN"
         description = "Should be blocked by gateway"
+        schedule = @{
+            startWeek = 1
+            endWeek = 16
+            weekType = "ALL"
+            weekday = 1
+            startSection = 1
+            endSection = 2
+            startTime = "08:00:00"
+            endTime = "09:45:00"
+            classroom = "DENY-$runId"
+        }
     } | Out-Null
 
 $studentStatus = Invoke-Api -Name "internal student status" -Method "GET" -Url "$StudentServiceUrl/internal/students/$studentId/status"
@@ -331,6 +387,10 @@ Assert-True (($studentEnrollments.data | Where-Object { $_.enrollmentId -eq $enr
 
 $timetable = Invoke-Api -Name "student timetable" -Method "GET" -Url "$BaseUrl/api/enrollments/students/$studentId/timetable" -Token $studentToken
 Assert-True (($timetable.data | Where-Object { $_.courseId -eq $courseId } | Measure-Object).Count -ge 1) "Timetable does not contain enrolled course."
+Assert-True (($timetable.data | Where-Object { $_.courseId -eq $courseId -and $_.startWeek -eq 1 -and $_.endWeek -eq 16 -and $_.weekType -eq "ALL" } | Measure-Object).Count -ge 1) "Timetable does not contain week metadata."
+
+$weekTimetable = Invoke-Api -Name "student week timetable" -Method "GET" -Url "$BaseUrl/api/enrollments/students/$studentId/timetable?weekNo=6" -Token $studentToken
+Assert-True (($weekTimetable.data | Where-Object { $_.courseId -eq $courseId } | Measure-Object).Count -ge 1) "Week timetable does not contain enrolled course."
 
 $adminEnrollments = Invoke-Api -Name "admin enrollment records" -Method "GET" -Url "$BaseUrl/api/enrollments?courseId=$courseId&pageSize=100" -Token $adminToken
 Assert-True (($adminEnrollments.data.records | Where-Object { $_.enrollmentId -eq $enrollmentId } | Measure-Object).Count -ge 1) "Admin enrollment list does not contain smoke test enrollment."

@@ -5,7 +5,12 @@
     <resultMap id="CourseScheduleResultMap" type="com.yun.studentcourse.course.entity.CourseSchedule">
         <id column="schedule_id" property="scheduleId"/>
         <result column="course_id" property="courseId"/>
+        <result column="start_week" property="startWeek"/>
+        <result column="end_week" property="endWeek"/>
+        <result column="week_type" property="weekType"/>
         <result column="weekday" property="weekday"/>
+        <result column="start_section" property="startSection"/>
+        <result column="end_section" property="endSection"/>
         <result column="start_time" property="startTime"/>
         <result column="end_time" property="endTime"/>
         <result column="classroom" property="classroom"/>
@@ -15,23 +20,25 @@
 
     <insert id="insert" parameterType="com.yun.studentcourse.course.entity.CourseSchedule" useGeneratedKeys="true" keyProperty="scheduleId">
         INSERT INTO course_schedule (
-            course_id, weekday, start_time, end_time, classroom
+            course_id, start_week, end_week, week_type, weekday, start_section, end_section, start_time, end_time, classroom
         ) VALUES (
-            #{courseId}, #{weekday}, #{startTime}, #{endTime}, #{classroom}
+            #{courseId}, #{startWeek}, #{endWeek}, #{weekType}, #{weekday}, #{startSection}, #{endSection}, #{startTime}, #{endTime}, #{classroom}
         )
     </insert>
 
     <select id="findByCourseId" resultMap="CourseScheduleResultMap">
-        SELECT schedule_id, course_id, weekday, start_time, end_time, classroom, create_time, update_time
+        SELECT schedule_id, course_id, start_week, end_week, week_type, weekday, start_section, end_section, start_time, end_time, classroom, create_time, update_time
         FROM course_schedule
         WHERE course_id = #{courseId}
-        ORDER BY weekday ASC, start_time ASC
+        ORDER BY weekday ASC, start_section ASC, start_week ASC
     </select>
 
     <select id="findClassroomConflicts" resultMap="CourseScheduleResultMap">
-        SELECT schedule_id, course_id, weekday, start_time, end_time, classroom, create_time, update_time
+        SELECT schedule_id, course_id, start_week, end_week, week_type, weekday, start_section, end_section, start_time, end_time, classroom, create_time, update_time
         FROM course_schedule
         WHERE classroom = #{classroom}
+          AND start_week &lt;= #{endWeek}
+          AND #{startWeek} &lt;= end_week
           AND weekday = #{weekday}
           AND start_time &lt; #{endTime}
           AND #{startTime} &lt; end_time

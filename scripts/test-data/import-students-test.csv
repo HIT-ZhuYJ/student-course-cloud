@@ -1,0 +1,6 @@
+studentNo,name,major,grade,phone,email,username,password,status
+S2026001,Li Ming CSV Old,Computer Science,2026,13810001001,liming-old@example.com,unused_s2026001,student123,ACTIVE
+S2026001,Li Ming CSV Updated,Data Science,2026,13810001002,liming-updated@example.com,unused_s2026001,student123,ACTIVE
+SCSV9001,Alice Import Draft,Software Engineering,2026,13890001001,alice-draft@example.com,student_csv_9001,student123,ACTIVE
+SCSV9001,Alice Import Final,Artificial Intelligence,2026,13890001002,alice-final@example.com,student_csv_9001,student123,ACTIVE
+SCSV9002,Bob Import,Network Engineering,2025,13890002001,bob-import@example.com,student_csv_9002,student123,ACTIVE

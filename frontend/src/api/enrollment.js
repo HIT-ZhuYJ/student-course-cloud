@@ -12,8 +12,8 @@ export function listStudentEnrollments(studentId) {
   return request.get(`/api/enrollments/students/${studentId}`)
 }
 
-export function getStudentTimetable(studentId) {
-  return request.get(`/api/enrollments/students/${studentId}/timetable`)
+export function getStudentTimetable(studentId, params = {}) {
+  return request.get(`/api/enrollments/students/${studentId}/timetable`, { params })
 }
 
 export function listEnrollments(params) {

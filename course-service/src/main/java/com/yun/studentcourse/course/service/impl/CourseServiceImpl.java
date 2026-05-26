@@ -26,6 +26,9 @@ public class CourseServiceImpl implements CourseService {
     private static final String OPEN = "OPEN";
     private static final String CLOSED = "CLOSED";
     private static final String DISABLED = "DISABLED";
+    private static final String WEEK_ALL = "ALL";
+    private static final String WEEK_ODD = "ODD";
+    private static final String WEEK_EVEN = "EVEN";
 
     private final CourseMapper courseMapper;
     private final CourseScheduleMapper courseScheduleMapper;
@@ -53,6 +56,7 @@ public class CourseServiceImpl implements CourseService {
         course.setStatus(status);
         course.setDescription(request.getDescription());
         courseMapper.insert(course);
+        createSchedule(course.getCourseId(), request.getSchedule());
         return toResponse(courseMapper.findById(course.getCourseId()));
     }
 
@@ -110,15 +114,34 @@ public class CourseServiceImpl implements CourseService {
     @Transactional
     public CourseScheduleResponse addSchedule(Long courseId, CourseScheduleRequest request) {
         requireCourse(courseId);
+        return createSchedule(courseId, request);
+    }
+
+    private CourseScheduleResponse createSchedule(Long courseId, CourseScheduleRequest request) {
+        validateWeekRange(request.getStartWeek(), request.getEndWeek());
+        String weekType = normalizeWeekType(request.getWeekType());
+        if (request.getStartSection() > request.getEndSection()) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "startSection must be less than or equal to endSection");
+        }
         if (!request.getStartTime().isBefore(request.getEndTime())) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "startTime must be before endTime");
         }
+        String classroom = request.getClassroom().trim();
         List<CourseSchedule> classroomConflicts = courseScheduleMapper.findClassroomConflicts(
-                request.getClassroom(),
+                classroom,
+                request.getStartWeek(),
+                request.getEndWeek(),
                 request.getWeekday(),
                 request.getStartTime(),
                 request.getEndTime()
-        );
+        ).stream().filter(existing -> weeksOverlap(
+                existing.getStartWeek(),
+                existing.getEndWeek(),
+                existing.getWeekType(),
+                request.getStartWeek(),
+                request.getEndWeek(),
+                weekType
+        )).toList();
         if (!classroomConflicts.isEmpty()) {
             CourseSchedule conflict = classroomConflicts.get(0);
             throw new BusinessException(
@@ -129,10 +152,15 @@ public class CourseServiceImpl implements CourseService {
 
         CourseSchedule schedule = new CourseSchedule();
         schedule.setCourseId(courseId);
+        schedule.setStartWeek(request.getStartWeek());
+        schedule.setEndWeek(request.getEndWeek());
+        schedule.setWeekType(weekType);
         schedule.setWeekday(request.getWeekday());
+        schedule.setStartSection(request.getStartSection());
+        schedule.setEndSection(request.getEndSection());
         schedule.setStartTime(request.getStartTime());
         schedule.setEndTime(request.getEndTime());
-        schedule.setClassroom(request.getClassroom());
+        schedule.setClassroom(classroom);
         courseScheduleMapper.insert(schedule);
         return toScheduleResponse(schedule);
     }
@@ -203,6 +231,41 @@ public class CourseServiceImpl implements CourseService {
         return StringUtils.hasText(keyword) ? keyword.trim() : null;
     }
 
+    private void validateWeekRange(int startWeek, int endWeek) {
+        if (startWeek < 1 || endWeek > 30 || startWeek > endWeek) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "week range must be between 1 and 30 and startWeek must be <= endWeek");
+        }
+    }
+
+    private String normalizeWeekType(String weekType) {
+        String normalized = StringUtils.hasText(weekType) ? weekType.trim().toUpperCase() : WEEK_ALL;
+        if (!WEEK_ALL.equals(normalized) && !WEEK_ODD.equals(normalized) && !WEEK_EVEN.equals(normalized)) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "weekType must be ALL, ODD or EVEN");
+        }
+        return normalized;
+    }
+
+    private boolean weeksOverlap(int leftStart, int leftEnd, String leftType, int rightStart, int rightEnd, String rightType) {
+        int start = Math.max(leftStart, rightStart);
+        int end = Math.min(leftEnd, rightEnd);
+        if (start > end) {
+            return false;
+        }
+        for (int week = start; week <= end; week++) {
+            if (matchesWeekType(week, leftType) && matchesWeekType(week, rightType)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean matchesWeekType(int week, String weekType) {
+        String normalized = normalizeWeekType(weekType);
+        return WEEK_ALL.equals(normalized)
+                || (WEEK_ODD.equals(normalized) && week % 2 == 1)
+                || (WEEK_EVEN.equals(normalized) && week % 2 == 0);
+    }
+
     private CourseCapacityResponse toCapacityResponse(Course course) {
         return new CourseCapacityResponse(
                 course.getCourseId(),
@@ -232,7 +295,12 @@ public class CourseServiceImpl implements CourseService {
         CourseScheduleResponse response = new CourseScheduleResponse();
         response.setScheduleId(schedule.getScheduleId());
         response.setCourseId(schedule.getCourseId());
+        response.setStartWeek(schedule.getStartWeek());
+        response.setEndWeek(schedule.getEndWeek());
+        response.setWeekType(schedule.getWeekType());
         response.setWeekday(schedule.getWeekday());
+        response.setStartSection(schedule.getStartSection());
+        response.setEndSection(schedule.getEndSection());
         response.setStartTime(schedule.getStartTime());
         response.setEndTime(schedule.getEndTime());
         response.setClassroom(schedule.getClassroom());

@@ -47,16 +47,23 @@
       <div class="table-card">
         <table>
           <thead>
-            <tr><th>星期</th><th>开始</th><th>结束</th><th>教室</th></tr>
+            <tr>
+              <th>周次</th>
+              <th>星期</th>
+              <th>节次</th>
+              <th>时间</th>
+              <th>教室</th>
+            </tr>
           </thead>
           <tbody>
             <tr v-for="item in schedules" :key="item.scheduleId">
+              <td>第{{ item.startWeek }}-{{ item.endWeek }}周 {{ weekTypeText(item.weekType) }}</td>
               <td>{{ weekdayText(item.weekday) }}</td>
-              <td>{{ item.startTime }}</td>
-              <td>{{ item.endTime }}</td>
+              <td>第{{ item.startSection }}-{{ item.endSection }}节</td>
+              <td>{{ item.startTime }}-{{ item.endTime }}</td>
               <td>{{ item.classroom }}</td>
             </tr>
-            <tr v-if="!schedules.length"><td colspan="4">暂无上课时间</td></tr>
+            <tr v-if="!schedules.length"><td colspan="5">暂无上课时间</td></tr>
           </tbody>
         </table>
       </div>
@@ -109,5 +116,11 @@ async function showSchedules(courseId) {
 
 function weekdayText(value) {
   return ['星期一', '星期二', '星期三', '星期四', '星期五', '星期六', '星期日'][value - 1] || value
+}
+
+function weekTypeText(value) {
+  if (value === 'ODD') return '单周'
+  if (value === 'EVEN') return '双周'
+  return '每周'
 }
 </script>

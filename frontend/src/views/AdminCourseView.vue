@@ -3,6 +3,7 @@
     <div class="section-toolbar">
       <div>
         <h2>课程管理</h2>
+        <p class="muted">课程时间支持教学周、单双周、星期、节次和上课地点。</p>
       </div>
       <button class="secondary-button" type="button" @click="loadCourses">刷新</button>
     </div>
@@ -32,6 +33,30 @@
         <label>容量<input v-model.number="courseForm.capacity" type="number" min="1" required /></label>
         <label>状态<input v-model.trim="courseForm.status" placeholder="OPEN / CLOSED / DISABLED" required /></label>
         <label>描述<input v-model.trim="courseForm.description" /></label>
+        <template v-if="!editingCourseId">
+          <h3 class="form-subtitle">首个课程时间</h3>
+          <div class="form-grid">
+            <label>星期
+              <select v-model.number="courseScheduleForm.weekday" required>
+                <option v-for="day in weekdays" :key="day.value" :value="day.value">{{ day.label }}</option>
+              </select>
+            </label>
+            <label>起始周<input v-model.number="courseScheduleForm.startWeek" type="number" min="1" max="30" required /></label>
+            <label>结束周<input v-model.number="courseScheduleForm.endWeek" type="number" min="1" max="30" required /></label>
+            <label>周次类型
+              <select v-model="courseScheduleForm.weekType" required>
+                <option value="ALL">每周</option>
+                <option value="ODD">单周</option>
+                <option value="EVEN">双周</option>
+              </select>
+            </label>
+            <label>开始节<input v-model.number="courseScheduleForm.startSection" type="number" min="1" max="12" required @change="syncTimeBySection(courseScheduleForm)" /></label>
+            <label>结束节<input v-model.number="courseScheduleForm.endSection" type="number" min="1" max="12" required @change="syncTimeBySection(courseScheduleForm)" /></label>
+            <label>教室<input v-model.trim="courseScheduleForm.classroom" required /></label>
+            <label>开始时间<input v-model="courseScheduleForm.startTime" type="time" step="1" required /></label>
+            <label>结束时间<input v-model="courseScheduleForm.endTime" type="time" step="1" required /></label>
+          </div>
+        </template>
         <div class="button-row">
           <button class="primary-button compact" :disabled="savingCourse">{{ savingCourse ? '保存中...' : '保存课程' }}</button>
           <button v-if="editingCourseId" class="secondary-button" type="button" @click="resetCourseForm">取消编辑</button>
@@ -40,11 +65,28 @@
 
       <form class="form-panel" @submit.prevent="addSchedule">
         <h3>新增课程时间</h3>
-        <label>课程ID<input v-model.number="scheduleForm.courseId" type="number" min="1" required /></label>
-        <label>星期<input v-model.number="scheduleForm.weekday" type="number" min="1" max="7" required /></label>
-        <label>开始时间<input v-model="scheduleForm.startTime" type="time" step="1" required /></label>
-        <label>结束时间<input v-model="scheduleForm.endTime" type="time" step="1" required /></label>
-        <label>教室<input v-model.trim="scheduleForm.classroom" required /></label>
+        <div class="form-grid">
+          <label>课程ID<input v-model.number="scheduleForm.courseId" type="number" min="1" required /></label>
+          <label>星期
+            <select v-model.number="scheduleForm.weekday">
+              <option v-for="day in weekdays" :key="day.value" :value="day.value">{{ day.label }}</option>
+            </select>
+          </label>
+          <label>起始周<input v-model.number="scheduleForm.startWeek" type="number" min="1" max="30" required /></label>
+          <label>结束周<input v-model.number="scheduleForm.endWeek" type="number" min="1" max="30" required /></label>
+          <label>周次类型
+            <select v-model="scheduleForm.weekType">
+              <option value="ALL">每周</option>
+              <option value="ODD">单周</option>
+              <option value="EVEN">双周</option>
+            </select>
+          </label>
+          <label>开始节<input v-model.number="scheduleForm.startSection" type="number" min="1" max="12" required @change="syncTimeBySection(scheduleForm)" /></label>
+          <label>结束节<input v-model.number="scheduleForm.endSection" type="number" min="1" max="12" required @change="syncTimeBySection(scheduleForm)" /></label>
+          <label>教室<input v-model.trim="scheduleForm.classroom" required /></label>
+          <label>开始时间<input v-model="scheduleForm.startTime" type="time" step="1" required /></label>
+          <label>结束时间<input v-model="scheduleForm.endTime" type="time" step="1" required /></label>
+        </div>
         <button class="primary-button compact" :disabled="savingSchedule">{{ savingSchedule ? '提交中...' : '新增时间' }}</button>
       </form>
     </div>
@@ -84,32 +126,69 @@
       </table>
     </div>
 
-    <section v-if="selectedCourseId" class="sub-section">
-      <h2>课程 {{ selectedCourseId }} 时间</h2>
-      <div class="table-card">
+    <div v-if="selectedCourseId" class="modal-mask" @click.self="closeSchedules">
+      <div class="modal-panel wide">
+        <div class="modal-header">
+          <h2>课程 {{ selectedCourseId }} 时间</h2>
+          <button class="icon-button" type="button" aria-label="关闭" @click="closeSchedules">×</button>
+        </div>
         <table>
           <thead>
-            <tr><th>ID</th><th>星期</th><th>开始</th><th>结束</th><th>教室</th></tr>
+            <tr>
+              <th>ID</th>
+              <th>周次</th>
+              <th>星期</th>
+              <th>节次</th>
+              <th>时间</th>
+              <th>教室</th>
+            </tr>
           </thead>
           <tbody>
             <tr v-for="item in schedules" :key="item.scheduleId">
               <td>{{ item.scheduleId }}</td>
-              <td>{{ item.weekday }}</td>
-              <td>{{ item.startTime }}</td>
-              <td>{{ item.endTime }}</td>
+              <td>第{{ item.startWeek }}-{{ item.endWeek }}周 {{ weekTypeText(item.weekType) }}</td>
+              <td>{{ weekdayText(item.weekday) }}</td>
+              <td>第{{ item.startSection }}-{{ item.endSection }}节</td>
+              <td>{{ item.startTime }}-{{ item.endTime }}</td>
               <td>{{ item.classroom }}</td>
             </tr>
-            <tr v-if="!schedules.length"><td colspan="5">暂无课程时间</td></tr>
+            <tr v-if="!schedules.length"><td colspan="6">暂无课程时间</td></tr>
           </tbody>
         </table>
       </div>
-    </section>
+    </div>
   </section>
 </template>
 
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import { addCourseSchedule, createCourse, deleteCourse, listCourseSchedules, listCourses, updateCourse } from '../api/course'
+import { downloadCsv, parseCsv } from '../utils/csv'
+
+const weekdays = [
+  { value: 1, label: '星期一' },
+  { value: 2, label: '星期二' },
+  { value: 3, label: '星期三' },
+  { value: 4, label: '星期四' },
+  { value: 5, label: '星期五' },
+  { value: 6, label: '星期六' },
+  { value: 7, label: '星期日' }
+]
+
+const sectionTimes = {
+  1: '08:00:00',
+  2: '09:45:00',
+  3: '10:00:00',
+  4: '11:45:00',
+  5: '13:45:00',
+  6: '15:30:00',
+  7: '15:45:00',
+  8: '17:30:00',
+  9: '18:30:00',
+  10: '20:15:00',
+  11: '20:30:00',
+  12: '22:15:00'
+}
 
 const courses = ref([])
 const schedules = ref([])
@@ -122,7 +201,25 @@ const message = ref('')
 
 const filters = reactive({ keyword: '', status: '' })
 const courseForm = reactive({ courseCode: '', courseName: '', credit: 3, capacity: 30, status: 'OPEN', description: '' })
-const scheduleForm = reactive({ courseId: null, weekday: 1, startTime: '08:00:00', endTime: '09:40:00', classroom: '' })
+const courseScheduleForm = reactive(createDefaultSchedule())
+const scheduleForm = reactive({
+  courseId: null,
+  ...createDefaultSchedule()
+})
+
+function createDefaultSchedule() {
+  return {
+  startWeek: 1,
+  endWeek: 16,
+  weekType: 'ALL',
+  weekday: 1,
+  startSection: 1,
+  endSection: 2,
+  startTime: '08:00:00',
+  endTime: '09:45:00',
+  classroom: ''
+  }
+}
 
 onMounted(loadCourses)
 
@@ -142,6 +239,12 @@ async function loadCourses() {
 }
 
 function exportCourses() {
+  error.value = ''
+  message.value = ''
+  if (!courses.value.length) {
+    error.value = '当前没有可导出的课程数据'
+    return
+  }
   downloadCsv('courses.csv', [
     ['courseId', 'courseCode', 'courseName', 'credit', 'capacity', 'selectedCount', 'status', 'description'],
     ...courses.value.map((course) => [
@@ -155,6 +258,7 @@ function exportCourses() {
       course.description || ''
     ])
   ])
+  message.value = '课程 CSV 已导出'
 }
 
 async function importCourses(event) {
@@ -164,30 +268,85 @@ async function importCourses(event) {
   error.value = ''
   message.value = ''
   try {
-    const rows = parseCsv(await file.text())
-    let count = 0
+    const rows = mergeDuplicateRows(parseCsv(await file.text()), 'courseCode')
+    const existing = await fetchAllCourses()
+    let created = 0
+    let updated = 0
+    let skipped = 0
     for (const row of rows) {
-      if (!row.courseCode || !row.courseName) continue
-      await createCourse({
-        courseCode: row.courseCode,
-        courseName: row.courseName,
-        credit: Number(row.credit || 3),
-        capacity: Number(row.capacity || 30),
-        status: row.status || 'OPEN',
-        description: row.description || ''
-      })
-      count += 1
+      if (!row.courseCode || !row.courseName) {
+        skipped += 1
+        continue
+      }
+      const schedule = buildCsvSchedule(row)
+      const matched = existing.find((course) => sameText(course.courseCode, row.courseCode))
+      if (matched) {
+        await updateCourse(matched.courseId, {
+          courseName: row.courseName,
+          credit: Number(row.credit || matched.credit || 3),
+          capacity: Number(row.capacity || matched.capacity || 30),
+          status: normalizeCourseStatus(row.status, matched.status || 'OPEN'),
+          description: row.description || ''
+        })
+        await addScheduleIfMissing(matched.courseId, schedule)
+        Object.assign(matched, {
+          courseName: row.courseName,
+          credit: Number(row.credit || matched.credit || 3),
+          capacity: Number(row.capacity || matched.capacity || 30),
+          status: normalizeCourseStatus(row.status, matched.status || 'OPEN'),
+          description: row.description || ''
+        })
+        updated += 1
+      } else {
+        const res = await createCourse({
+          courseCode: row.courseCode,
+          courseName: row.courseName,
+          credit: Number(row.credit || 3),
+          capacity: Number(row.capacity || 30),
+          status: normalizeCourseStatus(row.status, 'OPEN'),
+          description: row.description || '',
+          schedule
+        })
+        existing.push({
+          courseId: res.data?.courseId,
+          courseCode: row.courseCode,
+          courseName: row.courseName,
+          credit: Number(row.credit || 3),
+          capacity: Number(row.capacity || 30),
+          status: normalizeCourseStatus(row.status, 'OPEN'),
+          description: row.description || ''
+        })
+        created += 1
+      }
     }
-    message.value = `已导入 ${count} 门课程`
+    message.value = `课程导入完成：新增 ${created}，更新 ${updated}，跳过 ${skipped}`
     await loadCourses()
   } catch (err) {
     error.value = err.normalizedMessage || err.message || '课程导入失败'
   }
 }
 
+async function fetchAllCourses() {
+  const res = await listCourses({ pageNo: 1, pageSize: 100 })
+  return res.data?.records || []
+}
+
+async function addScheduleIfMissing(courseId, schedule) {
+  const res = await listCourseSchedules(courseId)
+  const existingSchedules = res.data || []
+  if (existingSchedules.some((item) => sameSchedule(item, schedule))) {
+    return
+  }
+  await addCourseSchedule(courseId, schedule)
+}
+
 async function saveCourse() {
   if (!courseForm.courseName || !courseForm.credit || !courseForm.capacity) {
     error.value = '请填写课程名称、学分和容量'
+    return
+  }
+  if (!editingCourseId.value && !isValidSchedule(courseScheduleForm)) {
+    error.value = '新增课程必须填写有效的首个课程时间：周次、节次、时间和教室均为必填'
     return
   }
   savingCourse.value = true
@@ -204,8 +363,14 @@ async function saveCourse() {
       })
       message.value = '课程已更新'
     } else {
-      await createCourse(courseForm)
+      const created = await createCourse({
+        ...courseForm,
+        schedule: buildSchedulePayload(courseScheduleForm)
+      })
       message.value = '课程已新增'
+      if (created.data?.courseId) {
+        await showSchedules(created.data.courseId)
+      }
     }
     resetCourseForm()
     await loadCourses()
@@ -231,6 +396,7 @@ function editCourse(course) {
 function resetCourseForm() {
   editingCourseId.value = null
   Object.assign(courseForm, { courseCode: '', courseName: '', credit: 3, capacity: 30, status: 'OPEN', description: '' })
+  Object.assign(courseScheduleForm, createDefaultSchedule())
 }
 
 async function disableCourse(courseId) {
@@ -246,20 +412,15 @@ async function disableCourse(courseId) {
 }
 
 async function addSchedule() {
-  if (!scheduleForm.courseId || !scheduleForm.classroom || scheduleForm.startTime >= scheduleForm.endTime) {
-    error.value = '请填写有效课程时间'
+  if (!isValidSchedule(scheduleForm)) {
+    error.value = '请填写有效的课程时间：周次、节次和时间必须前后有序'
     return
   }
   savingSchedule.value = true
   error.value = ''
   message.value = ''
   try {
-    await addCourseSchedule(scheduleForm.courseId, {
-      weekday: scheduleForm.weekday,
-      startTime: normalizeTime(scheduleForm.startTime),
-      endTime: normalizeTime(scheduleForm.endTime),
-      classroom: scheduleForm.classroom
-    })
+    await addCourseSchedule(scheduleForm.courseId, buildSchedulePayload(scheduleForm))
     message.value = '课程时间已新增'
     await showSchedules(scheduleForm.courseId)
   } catch (err) {
@@ -267,6 +428,66 @@ async function addSchedule() {
   } finally {
     savingSchedule.value = false
   }
+}
+
+function isValidSchedule(form) {
+  return form
+    && (!Object.hasOwn(form, 'courseId') || form.courseId)
+    && form.classroom
+    && form.startWeek >= 1
+    && form.endWeek >= form.startWeek
+    && form.startSection >= 1
+    && form.endSection >= form.startSection
+    && normalizeTime(form.startTime) < normalizeTime(form.endTime)
+}
+
+function syncTimeBySection(form) {
+  form.startTime = sectionTimes[form.startSection] || form.startTime
+  form.endTime = sectionTimes[form.endSection] || form.endTime
+}
+
+function buildSchedulePayload(form) {
+  return {
+    startWeek: form.startWeek,
+    endWeek: form.endWeek,
+    weekType: form.weekType,
+    weekday: form.weekday,
+    startSection: form.startSection,
+    endSection: form.endSection,
+    startTime: normalizeTime(form.startTime),
+    endTime: normalizeTime(form.endTime),
+    classroom: form.classroom
+  }
+}
+
+function buildCsvSchedule(row) {
+  const schedule = {
+    startWeek: Number(row.startWeek),
+    endWeek: Number(row.endWeek),
+    weekType: row.weekType,
+    weekday: Number(row.weekday),
+    startSection: Number(row.startSection),
+    endSection: Number(row.endSection),
+    startTime: row.startTime,
+    endTime: row.endTime,
+    classroom: row.classroom
+  }
+  if (!isValidSchedule(schedule)) {
+    throw new Error(`课程 ${row.courseCode || row.courseName} 缺少有效课程时间`)
+  }
+  return buildSchedulePayload(schedule)
+}
+
+function sameSchedule(left, right) {
+  return Number(left.startWeek) === Number(right.startWeek)
+    && Number(left.endWeek) === Number(right.endWeek)
+    && String(left.weekType || 'ALL').trim().toUpperCase() === String(right.weekType || 'ALL').trim().toUpperCase()
+    && Number(left.weekday) === Number(right.weekday)
+    && Number(left.startSection) === Number(right.startSection)
+    && Number(left.endSection) === Number(right.endSection)
+    && normalizeTime(left.startTime) === normalizeTime(right.startTime)
+    && normalizeTime(left.endTime) === normalizeTime(right.endTime)
+    && sameText(left.classroom, right.classroom)
 }
 
 async function showSchedules(courseId) {
@@ -280,28 +501,44 @@ async function showSchedules(courseId) {
   }
 }
 
+function closeSchedules() {
+  selectedCourseId.value = null
+  schedules.value = []
+}
+
 function normalizeTime(value) {
+  if (!value) return ''
   return value.length === 5 ? `${value}:00` : value
 }
 
-function parseCsv(text) {
-  const lines = text.trim().split(/\r?\n/).filter(Boolean)
-  if (lines.length < 2) return []
-  const headers = lines[0].split(',').map((item) => item.trim())
-  return lines.slice(1).map((line) => {
-    const values = line.split(',').map((item) => item.trim())
-    return Object.fromEntries(headers.map((header, index) => [header, values[index] || '']))
-  })
+function weekdayText(value) {
+  return weekdays.find((item) => item.value === value)?.label || value
 }
 
-function downloadCsv(filename, rows) {
-  const csv = rows.map((row) => row.map((value) => `"${String(value ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')
-  const blob = new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = filename
-  link.click()
-  URL.revokeObjectURL(url)
+function weekTypeText(value) {
+  if (value === 'ODD') return '单周'
+  if (value === 'EVEN') return '双周'
+  return '每周'
+}
+
+function mergeDuplicateRows(rows, key) {
+  return rows.reduce((merged, row) => {
+    const index = merged.findIndex((item) => sameText(item[key], row[key]))
+    if (index >= 0) {
+      merged[index] = { ...merged[index], ...row }
+    } else {
+      merged.push(row)
+    }
+    return merged
+  }, [])
+}
+
+function normalizeCourseStatus(value, fallback) {
+  const status = String(value || fallback || 'OPEN').trim().toUpperCase()
+  return ['OPEN', 'CLOSED', 'DISABLED'].includes(status) ? status : 'OPEN'
+}
+
+function sameText(left, right) {
+  return String(left || '').trim() !== '' && String(left || '').trim() === String(right || '').trim()
 }
 </script>

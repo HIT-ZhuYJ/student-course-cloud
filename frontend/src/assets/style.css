@@ -236,6 +236,12 @@ select:focus {
   gap: 0 16px;
 }
 
+.form-subtitle {
+  margin-top: 12px;
+  padding-top: 14px;
+  border-top: 1px solid #e5e7eb;
+}
+
 .panel-grid {
   display: grid;
   grid-template-columns: 1fr;
@@ -274,6 +280,11 @@ select:focus {
 
 .filter-row input {
   max-width: 220px;
+}
+
+.inline-field {
+  width: 160px;
+  margin-top: 0;
 }
 
 .primary-button,
@@ -316,15 +327,46 @@ select:focus {
   background: #eff6ff;
 }
 
+.secondary-button.active {
+  color: #ffffff;
+  background: #2563eb;
+  border-color: #2563eb;
+}
+
 .secondary-button {
   min-height: 38px;
   padding: 0 16px;
+}
+
+.icon-button {
+  width: 34px;
+  height: 34px;
+  display: inline-grid;
+  place-items: center;
+  color: #4b5563;
+  font-size: 22px;
+  line-height: 1;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.icon-button:hover {
+  color: #111827;
+  background: #f3f4f6;
 }
 
 .small-button {
   min-height: 32px;
   padding: 0 11px;
   font-size: 13px;
+}
+
+.small-button.selected {
+  color: #166534;
+  background: #f0fdf4;
+  border-color: #bbf7d0;
 }
 
 .file-button {
@@ -377,6 +419,133 @@ select:focus {
   background: #ffffff;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
+}
+
+.timetable-card {
+  overflow: auto;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+
+.timetable-title {
+  padding: 14px 16px;
+  color: #111827;
+  font-weight: 800;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.timetable-grid {
+  min-width: 980px;
+  display: grid;
+  grid-template-columns: 128px repeat(7, minmax(118px, 1fr));
+}
+
+.grid-head,
+.time-cell,
+.course-cell {
+  min-height: 96px;
+  padding: 10px;
+  border-right: 1px solid #eef0f3;
+  border-bottom: 1px solid #eef0f3;
+}
+
+.grid-head {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  color: #2563eb;
+  font-size: 13px;
+  font-weight: 800;
+  background: #f8fafc;
+}
+
+.time-head {
+  color: #6b7280;
+}
+
+.time-cell {
+  display: grid;
+  align-content: center;
+  gap: 6px;
+  color: #4b5563;
+  background: #fbfcfe;
+}
+
+.time-cell strong {
+  color: #111827;
+  font-size: 13px;
+}
+
+.time-cell span {
+  font-size: 12px;
+}
+
+.course-cell {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  background: #ffffff;
+}
+
+.course-block {
+  display: grid;
+  gap: 4px;
+  padding: 9px;
+  color: #1f2937;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+}
+
+.course-block strong {
+  color: #1d4ed8;
+  font-size: 13px;
+  line-height: 1.35;
+  white-space: normal;
+}
+
+.course-block span {
+  font-size: 12px;
+  line-height: 1.35;
+  white-space: normal;
+}
+
+.modal-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(17, 24, 39, 0.42);
+}
+
+.modal-panel {
+  width: min(760px, 100%);
+  max-height: min(720px, calc(100vh - 48px));
+  overflow: auto;
+  padding: 20px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.22);
+}
+
+.modal-panel.wide {
+  width: min(980px, 100%);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.modal-header h2 {
+  margin: 0;
 }
 
 table {
@@ -508,5 +677,13 @@ tr:last-child td {
 
   .filter-row input {
     max-width: none;
+  }
+
+  .inline-field {
+    width: 100%;
+  }
+
+  .modal-mask {
+    padding: 12px;
   }
 }

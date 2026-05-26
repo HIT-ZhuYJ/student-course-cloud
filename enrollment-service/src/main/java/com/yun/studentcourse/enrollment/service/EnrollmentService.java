@@ -16,7 +16,7 @@ public interface EnrollmentService {
 
     List<EnrollmentResponse> listStudentEnrollments(Long studentId);
 
-    List<TimetableResponse> getStudentTimetable(Long studentId);
+    List<TimetableResponse> getStudentTimetable(Long studentId, Integer weekNo);
 
     List<TeacherCourseStudentResponse> listTeacherCourseStudents(Long teacherId, Long courseId);
 

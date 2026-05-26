@@ -32,7 +32,12 @@
         <label>职称<input v-model.trim="teacherForm.title" /></label>
         <label>手机号<input v-model.trim="teacherForm.phone" /></label>
         <label>邮箱<input v-model.trim="teacherForm.email" type="email" /></label>
-        <label>状态<input v-model.trim="teacherForm.status" placeholder="ACTIVE / DISABLED" required /></label>
+        <label>状态
+          <select v-model="teacherForm.status" required>
+            <option value="ACTIVE">ACTIVE</option>
+            <option value="DISABLED">DISABLED</option>
+          </select>
+        </label>
         <div class="button-row">
           <button class="primary-button compact" :disabled="savingTeacher">{{ savingTeacher ? '保存中...' : '保存教师' }}</button>
           <button v-if="editingTeacherId" class="secondary-button" type="button" @click="resetTeacherForm">取消编辑</button>
@@ -124,6 +129,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { listCourses } from '../api/course'
 import { assignTeacherCourse, cancelTeacherCourse, createTeacher, deleteTeacher, listTeacherCourses, listTeachers, updateTeacher } from '../api/teacher'
+import { downloadCsv, parseCsv } from '../utils/csv'
 
 const teachers = ref([])
 const courses = ref([])
@@ -164,6 +170,12 @@ async function loadTeachers() {
 }
 
 function exportTeachers() {
+  error.value = ''
+  message.value = ''
+  if (!teachers.value.length) {
+    error.value = '当前没有可导出的教师数据'
+    return
+  }
   downloadCsv('teachers.csv', [
     ['teacherId', 'teacherNo', 'name', 'title', 'phone', 'email', 'status'],
     ...teachers.value.map((teacher) => [
@@ -176,6 +188,7 @@ function exportTeachers() {
       teacher.status
     ])
   ])
+  message.value = '教师 CSV 已导出'
 }
 
 async function importTeachers(event) {
@@ -185,27 +198,70 @@ async function importTeachers(event) {
   error.value = ''
   message.value = ''
   try {
-    const rows = parseCsv(await file.text())
-    let count = 0
+    const rows = mergeDuplicateRows(parseCsv(await file.text()), 'teacherNo')
+    const existing = await fetchAllTeachers()
+    let created = 0
+    let updated = 0
+    let skipped = 0
     for (const row of rows) {
-      if (!row.teacherNo || !row.username || !row.password || !row.name) continue
-      await createTeacher({
-        teacherNo: row.teacherNo,
-        username: row.username,
-        password: row.password,
-        name: row.name,
-        title: row.title || '',
-        phone: row.phone || '',
-        email: row.email || '',
-        status: row.status || 'ACTIVE'
-      })
-      count += 1
+      if (!row.teacherNo || !row.name) {
+        skipped += 1
+        continue
+      }
+      const matched = existing.find((teacher) => sameText(teacher.teacherNo, row.teacherNo))
+      if (matched) {
+        await updateTeacher(matched.teacherId, {
+          name: row.name,
+          title: row.title || '',
+          phone: row.phone || '',
+          email: row.email || '',
+          status: normalizeTeacherStatus(row.status, matched.status || 'ACTIVE')
+        })
+        Object.assign(matched, {
+          name: row.name,
+          title: row.title || '',
+          phone: row.phone || '',
+          email: row.email || '',
+          status: normalizeTeacherStatus(row.status, matched.status || 'ACTIVE')
+        })
+        updated += 1
+      } else {
+        if (!row.username || !row.password) {
+          skipped += 1
+          continue
+        }
+        const res = await createTeacher({
+          teacherNo: row.teacherNo,
+          username: row.username,
+          password: row.password,
+          name: row.name,
+          title: row.title || '',
+          phone: row.phone || '',
+          email: row.email || '',
+          status: normalizeTeacherStatus(row.status, 'ACTIVE')
+        })
+        existing.push({
+          teacherId: res.data?.teacherId,
+          teacherNo: row.teacherNo,
+          name: row.name,
+          title: row.title || '',
+          phone: row.phone || '',
+          email: row.email || '',
+          status: normalizeTeacherStatus(row.status, 'ACTIVE')
+        })
+        created += 1
+      }
     }
-    message.value = `已导入 ${count} 名教师`
+    message.value = `教师导入完成：新增 ${created}，更新 ${updated}，跳过 ${skipped}`
     await reload()
   } catch (err) {
     error.value = err.normalizedMessage || err.message || '教师导入失败'
   }
+}
+
+async function fetchAllTeachers() {
+  const res = await listTeachers({ pageNo: 1, pageSize: 100 })
+  return res.data?.records || []
 }
 
 async function loadCoursesForAssign() {
@@ -370,24 +426,24 @@ function selectedCountText(courseId) {
   return course ? `${course.selectedCount}/${course.capacity}` : '-'
 }
 
-function parseCsv(text) {
-  const lines = text.trim().split(/\r?\n/).filter(Boolean)
-  if (lines.length < 2) return []
-  const headers = lines[0].split(',').map((item) => item.trim())
-  return lines.slice(1).map((line) => {
-    const values = line.split(',').map((item) => item.trim())
-    return Object.fromEntries(headers.map((header, index) => [header, values[index] || '']))
-  })
+function mergeDuplicateRows(rows, key) {
+  return rows.reduce((merged, row) => {
+    const index = merged.findIndex((item) => sameText(item[key], row[key]))
+    if (index >= 0) {
+      merged[index] = { ...merged[index], ...row }
+    } else {
+      merged.push(row)
+    }
+    return merged
+  }, [])
 }
 
-function downloadCsv(filename, rows) {
-  const csv = rows.map((row) => row.map((value) => `"${String(value ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')
-  const blob = new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = filename
-  link.click()
-  URL.revokeObjectURL(url)
+function normalizeTeacherStatus(value, fallback) {
+  const status = String(value || fallback || 'ACTIVE').trim().toUpperCase()
+  return status === 'DISABLED' ? 'DISABLED' : 'ACTIVE'
+}
+
+function sameText(left, right) {
+  return String(left || '').trim() !== '' && String(left || '').trim() === String(right || '').trim()
 }
 </script>

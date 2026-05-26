@@ -210,7 +210,11 @@ docker compose up -d gateway-service
 | 管理员 | `admin` | `admin123` |
 | 学生 | `student001` | `student123` |
 | 学生 | `student002` | `student123` |
+| 学生 | `student003` | `student123` |
 | 教师 | `teacher001` | `teacher123` |
+| 教师 | `teacher002` | `teacher123` |
+| 教师 | `teacher003` | `teacher123` |
+| 教师 | `teacher004` | `teacher123` |
 
 ## 10. 常见问题
 

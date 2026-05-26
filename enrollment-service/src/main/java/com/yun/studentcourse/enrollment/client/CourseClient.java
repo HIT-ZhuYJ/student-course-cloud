@@ -2,6 +2,7 @@ package com.yun.studentcourse.enrollment.client;
 
 import com.yun.studentcourse.common.Result;
 import com.yun.studentcourse.enrollment.client.dto.CourseCapacityResponse;
+import com.yun.studentcourse.enrollment.client.dto.CourseResponse;
 import com.yun.studentcourse.enrollment.client.dto.CourseScheduleResponse;
 import com.yun.studentcourse.enrollment.client.fallback.CourseClientFallback;
 import org.springframework.cloud.openfeign.FeignClient;
@@ -19,6 +20,9 @@ public interface CourseClient {
 
     @GetMapping("/internal/courses/{courseId}/schedule")
     Result<List<CourseScheduleResponse>> getSchedule(@PathVariable("courseId") Long courseId);
+
+    @GetMapping("/courses/{courseId}")
+    Result<CourseResponse> getCourse(@PathVariable("courseId") Long courseId);
 
     @PostMapping("/internal/courses/{courseId}/increase-selected-count")
     Result<CourseCapacityResponse> increaseSelectedCount(@PathVariable("courseId") Long courseId);
