@@ -122,11 +122,23 @@ spec:
             - name: grafana-datasource
               mountPath: /etc/grafana/provisioning/datasources
               readOnly: true
+            - name: grafana-dashboard-provider
+              mountPath: /etc/grafana/provisioning/dashboards
+              readOnly: true
+            - name: grafana-dashboard-scms
+              mountPath: /var/lib/grafana/dashboards
+              readOnly: true
             - name: grafana-data
               mountPath: /var/lib/grafana
       volumes:
         - name: grafana-datasource
           configMap:
             name: grafana-datasource
+        - name: grafana-dashboard-provider
+          configMap:
+            name: grafana-dashboard-provider
+        - name: grafana-dashboard-scms
+          configMap:
+            name: grafana-dashboard-scms
         - name: grafana-data
           emptyDir: {}

@@ -71,6 +71,7 @@ docker/maven/settings.xml
 | 组件 | 地址 | 说明 |
 |---|---|---|
 | 系统入口 | <http://localhost> | 通过 Nginx 访问前端和 `/api/**` |
+| HTTPS 系统入口 | <https://localhost> | 通过 Nginx HTTPS 访问前端和 `/api/**`，使用本机演示自签名证书 |
 | Gateway | <http://localhost:8080> | 调试用，正式演示建议走 Nginx |
 | Eureka | <http://localhost:8761> | 查看服务注册情况 |
 | Prometheus | <http://localhost:9090> | 查看指标抓取状态 |
@@ -81,14 +82,16 @@ docker/maven/settings.xml
 
 前端在 Docker 部署中会请求同源 `/api/**`，由 Nginx 转发到 `gateway-service:8080`。
 
+HTTPS 入口使用镜像构建阶段生成的 `localhost` 自签名证书，仅用于本机课堂演示。首次用浏览器打开 `https://localhost` 时，浏览器可能提示证书不受信任，需要手动继续访问。
+
 ## 4. Nginx 转发关系
 
 Docker 环境中的请求链路：
 
 ```text
 Browser
-  -> http://localhost
-  -> nginx:80
+  -> http://localhost 或 https://localhost
+  -> nginx:80 或 nginx:443
      -> /          直接返回镜像内的 Vue 静态资源
      -> /api/**    转发到 gateway-service:8080
   -> gateway-service
@@ -233,7 +236,22 @@ ports:
 http://localhost:8088
 ```
 
-### 10.2 3307 端口被占用
+### 10.2 443 端口被占用
+
+如果宿主机已有 HTTPS 服务占用 443，可以修改 `docker-compose.yml` 中 nginx 的 HTTPS 端口映射：
+
+```yaml
+ports:
+  - "8443:443"
+```
+
+然后访问：
+
+```text
+https://localhost:8443
+```
+
+### 10.3 3307 端口被占用
 
 修改 MySQL 端口映射，例如：
 
@@ -244,7 +262,7 @@ ports:
 
 容器内部服务仍访问 `mysql:3306`，不受宿主机端口变化影响。
 
-### 10.3 MySQL 初始化数据没有变化
+### 10.4 MySQL 初始化数据没有变化
 
 MySQL 初始化 SQL 只会在数据卷第一次创建时执行。需要重建数据库时执行：
 
@@ -253,7 +271,7 @@ docker compose down -v
 docker compose up -d --build
 ```
 
-### 10.4 Eureka 页面暂时没有服务
+### 10.5 Eureka 页面暂时没有服务
 
 业务服务启动和注册需要一点时间。可等待 30-60 秒后刷新：
 
@@ -261,14 +279,14 @@ docker compose up -d --build
 http://localhost:8761
 ```
 
-### 10.5 ELK 启动慢
+### 10.6 ELK 启动慢
 
 Elasticsearch 和 Kibana 首次启动较慢。如果 Docker 内存不足，Kibana 或 Logstash 可能反复重启。建议提高 Docker Desktop 内存，或临时关闭 ELK 服务。
 
 ## 11. Docker 部署验收步骤
 
 1. 执行 `docker compose up -d --build`。
-2. 打开 <http://localhost>。
+2. 打开 <http://localhost> 或 <https://localhost>。
 3. 使用 `admin/admin123` 登录。
 4. 查看课程、教师、学生、选课记录页面。
 5. 打开 <http://localhost:8761>，确认服务注册。

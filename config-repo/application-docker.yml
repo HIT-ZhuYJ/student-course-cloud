@@ -6,8 +6,10 @@ studentcourse:
     default-zone: http://eureka-service:8761/eureka/
   frontend:
     origin: http://localhost
+    https-origin: https://localhost
   nginx:
     origin: http://localhost
+    https-origin: https://localhost
 
 eureka:
   instance:

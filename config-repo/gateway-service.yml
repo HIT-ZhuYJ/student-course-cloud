@@ -12,7 +12,9 @@ spring:
           '[/**]':
             allowed-origins:
               - ${studentcourse.frontend.origin:http://localhost:5173}
+              - ${studentcourse.frontend.https-origin:https://localhost:5173}
               - ${studentcourse.nginx.origin:http://localhost}
+              - ${studentcourse.nginx.https-origin:https://localhost}
             allowed-methods:
               - GET
               - POST
