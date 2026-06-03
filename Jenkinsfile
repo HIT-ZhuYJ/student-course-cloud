@@ -81,7 +81,7 @@ write_service_dockerfile() {
   module="$1"
   port="$2"
   cat > "$module/Dockerfile.ci" <<EOF
-FROM docker.1ms.run/library/maven:3.9.9-eclipse-temurin-17
+FROM 192.168.40.129:5000/student-course/maven:3.9.9-eclipse-temurin-17
 WORKDIR /app
 RUN mkdir -p /logs
 COPY ci-artifacts/${module}.jar /app/app.jar
@@ -102,7 +102,7 @@ write_service_dockerfile course-service 8082
 write_service_dockerfile teacher-service 8083
 write_service_dockerfile enrollment-service 8084
 cat > frontend/Dockerfile.ci <<'EOF'
-FROM docker.1ms.run/library/maven:3.9.9-eclipse-temurin-17
+FROM 192.168.40.129:5000/student-course/maven:3.9.9-eclipse-temurin-17
 WORKDIR /app
 COPY ci-artifacts/frontend-dist/ /app/
 RUN cat > /tmp/StaticServer.java <<'JAVA'
@@ -157,7 +157,7 @@ EOF
 set -euo pipefail
 sudo_refresh() { printf '%s\n' "$K8S_SSH_PASSWORD" | sudo -S -v >/dev/null; }
 sudo_refresh
-printf '%s\n' "$REGISTRY_PASSWORD" | sudo -n nerdctl -n k8s.io login "$IMAGE_REGISTRY" -u "$REGISTRY_USERNAME" --password-stdin
+printf '%s\n' "$REGISTRY_PASSWORD" | sudo -n nerdctl -n k8s.io --insecure-registry login "$IMAGE_REGISTRY" -u "$REGISTRY_USERNAME" --password-stdin
 images=(
   "config-service|config-service|8888"
   "eureka-service|eureka-service|8761"
@@ -175,9 +175,9 @@ for item in "${images[@]}"; do
   image="$IMAGE_REGISTRY/$IMAGE_PROJECT/$module:$IMAGE_TAG"
   dockerfile="$module/Dockerfile.ci"
   echo "Building ${image} from ${dockerfile}"
-  sudo -n nerdctl -n k8s.io build -t "$image" -f "$dockerfile" .
+  sudo -n nerdctl -n k8s.io --insecure-registry build -t "$image" -f "$dockerfile" .
   echo "Pushing ${image}"
-  sudo -n nerdctl -n k8s.io push "$image"
+  sudo -n nerdctl -n k8s.io --insecure-registry push "$image"
 done
 '''
         }
@@ -275,18 +275,16 @@ done
 
     stage('Publish release branch') {
       steps {
-        sh '''#!/usr/bin/env bash
+        withCredentials([usernamePassword(credentialsId: 'github-release-credentials', usernameVariable: 'GITHUB_USERNAME', passwordVariable: 'GITHUB_TOKEN')]) {
+          sh '''#!/usr/bin/env bash
 set -euo pipefail
 commit="$(git rev-parse --short=8 HEAD)"
-if [ -z "${GITHUB_USERNAME:-}" ] || [ -z "${GITHUB_TOKEN:-}" ]; then
-  echo "GITHUB_USERNAME and GITHUB_TOKEN are required to publish ${RELEASE_BRANCH}."
-  exit 1
-fi
 auth="$(printf '%s:%s' "$GITHUB_USERNAME" "$GITHUB_TOKEN" | base64 | tr -d '\\n')"
 git -c "http.extraHeader=Authorization: Basic ${auth}" \
   push "$REPO_URL" "+HEAD:refs/heads/$RELEASE_BRANCH"
 echo "Published deployed commit ${commit} to ${RELEASE_BRANCH}"
 '''
+        }
       }
     }
   }
