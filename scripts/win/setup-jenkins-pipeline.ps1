@@ -95,4 +95,7 @@ if (Test-PortOpen -Port $HttpPort) {
 Write-Host ""
 Write-Host "Pipeline job path: $jobDir"
 Write-Host "Open: http://localhost:$HttpPort/job/$JobName/"
-Write-Host "Use Build with Parameters, set SSH_PASSWORD to the VM password, then run the pipeline."
+Write-Host "Before running, create Jenkins username/password credentials:"
+Write-Host "  - k8s-node-ssh: Kubernetes node SSH username and password"
+Write-Host "  - harbor-credentials: image registry username and password"
+Write-Host "Then open Build with Parameters, set IMAGE_REGISTRY/IMAGE_PROJECT as needed, and run the pipeline."

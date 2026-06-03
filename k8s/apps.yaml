@@ -123,7 +123,7 @@ spec:
             - name: TZ
               value: Asia/Shanghai
             - name: CONFIG_SERVER_URL
-              value: http://config-service:8888
+              value: http://config-service.student-course.svc.cluster.local:8888
             - name: SPRING_PROFILES_ACTIVE
               value: k8s
           ports:
@@ -194,7 +194,7 @@ spec:
             - name: TZ
               value: Asia/Shanghai
             - name: CONFIG_SERVER_URL
-              value: http://config-service:8888
+              value: http://config-service.student-course.svc.cluster.local:8888
             - name: SPRING_PROFILES_ACTIVE
               value: k8s
             - name: MYSQL_USER
@@ -280,7 +280,7 @@ spec:
             - name: TZ
               value: Asia/Shanghai
             - name: CONFIG_SERVER_URL
-              value: http://config-service:8888
+              value: http://config-service.student-course.svc.cluster.local:8888
             - name: SPRING_PROFILES_ACTIVE
               value: k8s
             - name: MYSQL_USER
@@ -366,7 +366,7 @@ spec:
             - name: TZ
               value: Asia/Shanghai
             - name: CONFIG_SERVER_URL
-              value: http://config-service:8888
+              value: http://config-service.student-course.svc.cluster.local:8888
             - name: SPRING_PROFILES_ACTIVE
               value: k8s
             - name: MYSQL_USER
@@ -452,7 +452,7 @@ spec:
             - name: TZ
               value: Asia/Shanghai
             - name: CONFIG_SERVER_URL
-              value: http://config-service:8888
+              value: http://config-service.student-course.svc.cluster.local:8888
             - name: SPRING_PROFILES_ACTIVE
               value: k8s
             - name: MYSQL_USER
@@ -540,7 +540,7 @@ spec:
             - name: TZ
               value: Asia/Shanghai
             - name: CONFIG_SERVER_URL
-              value: http://config-service:8888
+              value: http://config-service.student-course.svc.cluster.local:8888
             - name: SPRING_PROFILES_ACTIVE
               value: k8s
             - name: MYSQL_USER

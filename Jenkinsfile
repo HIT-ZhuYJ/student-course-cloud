@@ -7,97 +7,293 @@ pipeline {
     disableConcurrentBuilds()
   }
 
-  parameters {
-    string(name: 'LOCAL_WORKSPACE', defaultValue: 'D:/demo/YunSoftwareSystem', description: 'Repository path on the Jenkins machine. Leave empty when using SCM checkout.')
-    string(name: 'MASTER_HOST', defaultValue: '192.168.40.129', description: 'Kubernetes master SSH host.')
-    string(name: 'WORKER_HOSTS', defaultValue: '192.168.40.130,192.168.40.131', description: 'Comma-separated Kubernetes worker SSH hosts.')
-    string(name: 'SSH_USER', defaultValue: 'zyj', description: 'SSH user for Kubernetes nodes.')
-    string(name: 'SSH_PASSWORD', defaultValue: '123456', description: 'SSH password for Kubernetes nodes.')
-    booleanParam(name: 'APPLY_DEMO_DATA', defaultValue: true, description: 'Apply demo SQL data.')
-    booleanParam(name: 'RUN_SMOKE_TEST', defaultValue: true, description: 'Run API smoke test after deployment.')
-    booleanParam(name: 'RUN_DEGRADATION_TEST', defaultValue: false, description: 'Run load-balancing and degradation test.')
-    booleanParam(name: 'RESTART_OBSERVABILITY', defaultValue: true, description: 'Restart Prometheus, Grafana, Elasticsearch, Kibana and Logstash.')
-    booleanParam(name: 'SKIP_IMAGE_UPLOAD', defaultValue: false, description: 'Skip image archive upload/import when images are already on worker nodes.')
+  environment {
+    PATH = "/opt/node20/bin:/usr/local/bin:/usr/bin:/bin:${env.PATH}"
+    NPM_CONFIG_REGISTRY = 'https://registry.npmmirror.com'
+    REPO_URL = 'https://github.com/HIT-ZhuYJ/student-course-cloud.git'
+    SOURCE_BRANCH = 'main'
+    MASTER_HOST = '192.168.40.129'
+    NAMESPACE = 'student-course'
+    IMAGE_REGISTRY = '192.168.40.129:5000'
+    IMAGE_PROJECT = 'student-course'
+    IMAGE_PULL_SECRET = 'scms-registry-secret'
+    RELEASE_BRANCH = 'release/k8s-deployed'
   }
 
   stages {
-    stage('Prepare Workspace') {
+    stage('Checkout main') {
+      steps {
+        sh '''#!/usr/bin/env bash
+set -euo pipefail
+find "$WORKSPACE" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+git config --global http.version HTTP/1.1
+for i in 1 2 3; do
+  echo "Clone attempt $i"
+  if git clone --depth 1 --branch "$SOURCE_BRANCH" "$REPO_URL" "$WORKSPACE"; then
+    git rev-parse --short HEAD
+    git status --short
+    exit 0
+  fi
+  find "$WORKSPACE" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+  sleep 8
+done
+exit 1
+'''
+      }
+    }
+
+    stage('Prepare image tag') {
       steps {
         script {
-          if (params.LOCAL_WORKSPACE?.trim()) {
-            echo "Using local repository: ${params.LOCAL_WORKSPACE}"
-          } else {
-            checkout scm
-          }
+          env.SHORT_COMMIT = sh(script: 'git rev-parse --short=8 HEAD', returnStdout: true).trim()
+          env.IMAGE_TAG = "${env.BUILD_NUMBER}-${env.SHORT_COMMIT}"
+          echo "Image tag: ${env.IMAGE_TAG}"
         }
       }
     }
 
-    stage('Build And Redeploy') {
+    stage('Backend mvn test') {
       steps {
-        script {
-          if (!params.SSH_PASSWORD?.trim()) {
-            error 'SSH_PASSWORD is required. Open "Build with Parameters" and set it to the Kubernetes VM SSH password.'
-          }
+        sh 'mvn -U test'
+      }
+    }
 
-          def repoDir = params.LOCAL_WORKSPACE?.trim() ?: env.WORKSPACE
-          dir(repoDir) {
-            withEnv([
-              "SCMS_MASTER_HOST=${params.MASTER_HOST}",
-              "SCMS_WORKER_HOSTS=${params.WORKER_HOSTS}",
-              "SCMS_SSH_USER=${params.SSH_USER}",
-              "SCMS_SSH_PASSWORD=${params.SSH_PASSWORD}",
-              "SCMS_APPLY_DEMO_DATA=${params.APPLY_DEMO_DATA}",
-              "SCMS_RUN_SMOKE_TEST=${params.RUN_SMOKE_TEST}",
-              "SCMS_RUN_DEGRADATION_TEST=${params.RUN_DEGRADATION_TEST}",
-              "SCMS_RESTART_OBSERVABILITY=${params.RESTART_OBSERVABILITY}",
-              "SCMS_SKIP_IMAGE_UPLOAD=${params.SKIP_IMAGE_UPLOAD}"
-            ]) {
-              powershell '''
-$ErrorActionPreference = "Stop"
-
-if ([string]::IsNullOrWhiteSpace($env:SCMS_SSH_PASSWORD)) {
-    throw "SCMS_SSH_PASSWORD is empty. Re-run Build with Parameters and fill SSH_PASSWORD."
-}
-
-$redeployArgs = @(
-    "-ExecutionPolicy", "Bypass",
-    "-File", "scripts\\win\\redeploy-k8s.ps1",
-    "-MasterHost", $env:SCMS_MASTER_HOST,
-    "-WorkerHosts", $env:SCMS_WORKER_HOSTS,
-    "-Namespace", "student-course",
-    "-SshUser", $env:SCMS_SSH_USER,
-    "-SshPassword", $env:SCMS_SSH_PASSWORD
-)
-
-if ($env:SCMS_APPLY_DEMO_DATA -eq "true") {
-    $redeployArgs += "-ApplyDemoData"
-}
-if ($env:SCMS_RUN_SMOKE_TEST -eq "true") {
-    $redeployArgs += "-RunSmokeTest"
-}
-if ($env:SCMS_RUN_DEGRADATION_TEST -eq "true") {
-    $redeployArgs += "-RunDegradationTest"
-}
-if ($env:SCMS_RESTART_OBSERVABILITY -eq "true") {
-    $redeployArgs += "-RestartObservability"
-}
-if ($env:SCMS_SKIP_IMAGE_UPLOAD -eq "true") {
-    $redeployArgs += "-SkipImageUpload"
-}
-
-& powershell @redeployArgs
-'''
-            }
-          }
+    stage('Frontend build test') {
+      steps {
+        dir('frontend') {
+          sh 'npm ci --registry=https://registry.npmmirror.com && npm run build'
         }
+      }
+    }
+
+    stage('Package jars and prepare images') {
+      steps {
+        sh '''#!/usr/bin/env bash
+set -euo pipefail
+mvn -s docker/maven/settings.xml -DskipTests package
+rm -rf ci-artifacts
+mkdir -p ci-artifacts/frontend-dist
+for module in config-service eureka-service gateway-service student-service course-service teacher-service enrollment-service; do
+  cp "$module/target/$module-0.0.1-SNAPSHOT.jar" "ci-artifacts/$module.jar"
+done
+cp -R frontend/dist/. ci-artifacts/frontend-dist/
+write_service_dockerfile() {
+  module="$1"
+  port="$2"
+  cat > "$module/Dockerfile.ci" <<EOF
+FROM docker.1ms.run/library/maven:3.9.9-eclipse-temurin-17
+WORKDIR /app
+RUN mkdir -p /logs
+COPY ci-artifacts/${module}.jar /app/app.jar
+EOF
+  if [ "$module" = "config-service" ]; then
+    echo "COPY config-repo /app/config-repo" >> "$module/Dockerfile.ci"
+  fi
+  cat >> "$module/Dockerfile.ci" <<EOF
+EXPOSE ${port}
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]
+EOF
+}
+write_service_dockerfile config-service 8888
+write_service_dockerfile eureka-service 8761
+write_service_dockerfile gateway-service 8080
+write_service_dockerfile student-service 8081
+write_service_dockerfile course-service 8082
+write_service_dockerfile teacher-service 8083
+write_service_dockerfile enrollment-service 8084
+cat > frontend/Dockerfile.ci <<'EOF'
+FROM docker.1ms.run/library/maven:3.9.9-eclipse-temurin-17
+WORKDIR /app
+COPY ci-artifacts/frontend-dist/ /app/
+RUN cat > /tmp/StaticServer.java <<'JAVA'
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpServer;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+public class StaticServer {
+  private static final Path ROOT = Path.of("/app").toAbsolutePath().normalize();
+  public static void main(String[] args) throws Exception {
+    HttpServer server = HttpServer.create(new InetSocketAddress(80), 0);
+    server.createContext("/", StaticServer::handle);
+    server.start();
+  }
+  private static void handle(HttpExchange exchange) throws IOException {
+    String rawPath = exchange.getRequestURI().getPath();
+    Path target = ROOT.resolve(rawPath.substring(1)).normalize();
+    if (!target.startsWith(ROOT) || Files.isDirectory(target) || !Files.exists(target)) {
+      target = ROOT.resolve("index.html");
+    }
+    String name = target.getFileName().toString();
+    String type = name.endsWith(".js") ? "application/javascript" :
+      name.endsWith(".css") ? "text/css" :
+      name.endsWith(".html") ? "text/html; charset=utf-8" :
+      "application/octet-stream";
+    byte[] body = Files.readAllBytes(target);
+    exchange.getResponseHeaders().set("Content-Type", type);
+    exchange.sendResponseHeaders(200, body.length);
+    try (OutputStream os = exchange.getResponseBody()) { os.write(body); }
+  }
+}
+JAVA
+RUN javac /tmp/StaticServer.java
+EXPOSE 80
+CMD ["java", "-cp", "/tmp", "StaticServer"]
+EOF
+'''
+      }
+    }
+
+    stage('Build and push images') {
+      steps {
+        withCredentials([
+          usernamePassword(credentialsId: 'k8s-node-ssh', usernameVariable: 'K8S_SSH_USER', passwordVariable: 'K8S_SSH_PASSWORD'),
+          usernamePassword(credentialsId: 'harbor-credentials', usernameVariable: 'REGISTRY_USERNAME', passwordVariable: 'REGISTRY_PASSWORD')
+        ]) {
+          sh '''#!/usr/bin/env bash
+set -euo pipefail
+sudo_refresh() { printf '%s\n' "$K8S_SSH_PASSWORD" | sudo -S -v >/dev/null; }
+sudo_refresh
+printf '%s\n' "$REGISTRY_PASSWORD" | sudo -n nerdctl -n k8s.io login "$IMAGE_REGISTRY" -u "$REGISTRY_USERNAME" --password-stdin
+images=(
+  "config-service|config-service|8888"
+  "eureka-service|eureka-service|8761"
+  "gateway-service|gateway-service|8080"
+  "student-service|student-service|8081"
+  "course-service|course-service|8082"
+  "teacher-service|teacher-service|8083"
+  "enrollment-service|enrollment-service|8084"
+  "frontend|frontend|80"
+)
+for item in "${images[@]}"; do
+  module="${item%%|*}"
+  rest="${item#*|}"
+  container="${rest%%|*}"
+  image="$IMAGE_REGISTRY/$IMAGE_PROJECT/$module:$IMAGE_TAG"
+  dockerfile="$module/Dockerfile.ci"
+  echo "Building ${image} from ${dockerfile}"
+  sudo -n nerdctl -n k8s.io build -t "$image" -f "$dockerfile" .
+  echo "Pushing ${image}"
+  sudo -n nerdctl -n k8s.io push "$image"
+done
+'''
+        }
+      }
+    }
+
+    stage('Deploy to Kubernetes') {
+      steps {
+        withCredentials([
+          usernamePassword(credentialsId: 'harbor-credentials', usernameVariable: 'REGISTRY_USERNAME', passwordVariable: 'REGISTRY_PASSWORD')
+        ]
+        ) {
+          sh '''#!/usr/bin/env bash
+set -euo pipefail
+kubectl delete pod -n "$NAMESPACE" --field-selector=status.phase=Failed || true
+kubectl apply -f k8s/namespace.yaml
+kubectl apply -f k8s/secrets.yaml
+kubectl apply -f k8s/storage.yaml
+kubectl create configmap config-repo -n "$NAMESPACE" --from-file=config-repo --dry-run=client -o yaml | kubectl apply -f -
+kubectl create configmap mysql-init-sql -n "$NAMESPACE" --from-file=scripts/sql --dry-run=client -o yaml | kubectl apply -f -
+kubectl create configmap prometheus-conf -n "$NAMESPACE" --from-file=prometheus.yml=k8s/files/prometheus.yml --dry-run=client -o yaml | kubectl apply -f -
+kubectl create configmap grafana-datasource -n "$NAMESPACE" --from-file=prometheus.yml=k8s/files/grafana-datasource.yml --dry-run=client -o yaml | kubectl apply -f -
+kubectl create configmap grafana-dashboard-provider -n "$NAMESPACE" --from-file=provider.yml=k8s/files/grafana-dashboard-provider.yml --dry-run=client -o yaml | kubectl apply -f -
+kubectl create configmap grafana-dashboard-scms -n "$NAMESPACE" --from-file=scms-dashboard.json=k8s/files/scms-dashboard.json --dry-run=client -o yaml | kubectl apply -f -
+kubectl create configmap nginx-conf -n "$NAMESPACE" --from-file=nginx.conf=k8s/files/nginx.conf --dry-run=client -o yaml | kubectl apply -f -
+kubectl create configmap logstash-pipeline -n "$NAMESPACE" --from-file=logstash.conf=k8s/files/logstash.conf --dry-run=client -o yaml | kubectl apply -f -
+kubectl apply -f k8s/mysql.yaml
+kubectl rollout status statefulset/mysql -n "$NAMESPACE" --timeout=420s
+kubectl create secret docker-registry "$IMAGE_PULL_SECRET" -n "$NAMESPACE" \
+  --docker-server="$IMAGE_REGISTRY" \
+  --docker-username="$REGISTRY_USERNAME" \
+  --docker-password="$REGISTRY_PASSWORD" \
+  --dry-run=client -o yaml | kubectl apply -f -
+cat > /tmp/scms-serviceaccount-patch.json <<EOF
+{"imagePullSecrets":[{"name":"$IMAGE_PULL_SECRET"}]}
+EOF
+kubectl patch serviceaccount default -n "$NAMESPACE" --type merge -p "$(cat /tmp/scms-serviceaccount-patch.json)"
+kubectl apply -f k8s/apps.yaml
+kubectl apply -f k8s/frontend-nginx.yaml
+kubectl apply -f k8s/observability.yaml
+kubectl apply -f k8s/elk.yaml
+for d in eureka-service student-service course-service teacher-service enrollment-service gateway-service; do
+  kubectl set env "deployment/$d" CONFIG_SERVER_URL="http://config-service.${NAMESPACE}.svc.cluster.local:8888" -n "$NAMESPACE"
+done
+if [ -f scripts/sql/06-upgrade-course-schedule-weeks.sql ]; then
+  kubectl exec -i -n "$NAMESPACE" mysql-0 -- mysql -uroot -p123888 < scripts/sql/06-upgrade-course-schedule-weeks.sql
+fi
+if [ -f scripts/sql/05-demo-data.sql ]; then
+  kubectl exec -i -n "$NAMESPACE" mysql-0 -- mysql -uroot -p123888 < scripts/sql/05-demo-data.sql
+fi
+set_image() {
+  deployment="$1"
+  container="$2"
+  image="$IMAGE_REGISTRY/$IMAGE_PROJECT/$deployment:$IMAGE_TAG"
+  echo "kubectl set image deployment/$deployment $container=$image"
+  kubectl set image "deployment/$deployment" "$container=$image" -n "$NAMESPACE"
+  kubectl rollout status "deployment/$deployment" -n "$NAMESPACE" --timeout=420s
+}
+set_image config-service config-service
+set_image eureka-service eureka-service
+set_image student-service student-service
+set_image course-service course-service
+set_image teacher-service teacher-service
+set_image enrollment-service enrollment-service
+set_image gateway-service gateway-service
+set_image frontend frontend
+kubectl get pods -n "$NAMESPACE" -o wide
+kubectl get deployments -n "$NAMESPACE" -o custom-columns=NAME:.metadata.name,READY:.status.readyReplicas,IMAGES:.spec.template.spec.containers[*].image
+'''
+        }
+      }
+    }
+
+    stage('Smoke test') {
+      steps {
+        sh '''#!/usr/bin/env bash
+set -euo pipefail
+urls=(
+  "http://$MASTER_HOST:30080/"
+  "http://$MASTER_HOST:30080/api/courses"
+  "http://$MASTER_HOST:30081/actuator/health"
+  "http://$MASTER_HOST:30061/"
+  "http://$MASTER_HOST:30090/-/healthy"
+  "http://$MASTER_HOST:30300/api/health"
+  "http://$MASTER_HOST:30601/api/status"
+)
+for url in "${urls[@]}"; do
+  echo "Checking $url"
+  curl -fsS --max-time 20 "$url" >/dev/null
+  echo "OK $url"
+done
+'''
+      }
+    }
+
+    stage('Publish release branch') {
+      steps {
+        sh '''#!/usr/bin/env bash
+set -euo pipefail
+commit="$(git rev-parse --short=8 HEAD)"
+if [ -z "${GITHUB_USERNAME:-}" ] || [ -z "${GITHUB_TOKEN:-}" ]; then
+  echo "GITHUB_USERNAME and GITHUB_TOKEN are required to publish ${RELEASE_BRANCH}."
+  exit 1
+fi
+auth="$(printf '%s:%s' "$GITHUB_USERNAME" "$GITHUB_TOKEN" | base64 | tr -d '\\n')"
+git -c "http.extraHeader=Authorization: Basic ${auth}" \
+  push "$REPO_URL" "+HEAD:refs/heads/$RELEASE_BRANCH"
+echo "Published deployed commit ${commit} to ${RELEASE_BRANCH}"
+'''
       }
     }
   }
 
   post {
-    always {
-      echo 'CI/CD pipeline finished. Check the stage log for build, deployment and validation details.'
-    }
+    success { echo "CI/CD success. Deployed image tag ${env.IMAGE_TAG}" }
+    failure { echo 'CI/CD failed. Check console output.' }
+    always { echo 'CI/CD pipeline finished.' }
   }
 }

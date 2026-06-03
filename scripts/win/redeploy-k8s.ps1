@@ -6,6 +6,17 @@ param(
     [string]$Namespace = "student-course",
     [string]$RemoteRoot = "/tmp/scms-redeploy",
     [string]$MysqlRootPassword = "123888",
+    [ValidateSet("docker", "nerdctl")]
+    [string]$ImageBuilder = "docker",
+    [string]$ImageRegistry = "",
+    [string]$ImageProject = "student-course",
+    [string]$ImageTag = "",
+    [string]$RegistryUsername = "",
+    [string]$RegistryPassword = "",
+    [string]$ImagePullSecretName = "harbor-registry-secret",
+    [switch]$PushImages,
+    [switch]$UpdateK8sImages,
+    [switch]$CreateImagePullSecret,
     [switch]$SkipBackendBuild,
     [switch]$SkipFrontendBuild,
     [switch]$SkipImageBuild,
@@ -27,15 +38,15 @@ $WorkerHosts = @(
         Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
 )
 
-$Images = @(
-    @{ Name = "yunsoftwaresystem-config-service:latest"; File = "config-service/Dockerfile" },
-    @{ Name = "yunsoftwaresystem-eureka-service:latest"; File = "eureka-service/Dockerfile" },
-    @{ Name = "yunsoftwaresystem-gateway-service:latest"; File = "gateway-service/Dockerfile" },
-    @{ Name = "yunsoftwaresystem-student-service:latest"; File = "student-service/Dockerfile" },
-    @{ Name = "yunsoftwaresystem-course-service:latest"; File = "course-service/Dockerfile" },
-    @{ Name = "yunsoftwaresystem-teacher-service:latest"; File = "teacher-service/Dockerfile" },
-    @{ Name = "yunsoftwaresystem-enrollment-service:latest"; File = "enrollment-service/Dockerfile" },
-    @{ Name = "yunsoftwaresystem-frontend:latest"; File = "frontend/Dockerfile" }
+$ImageDefinitions = @(
+    @{ Deployment = "config-service"; Container = "config-service"; Repository = "config-service"; LocalName = "yunsoftwaresystem-config-service"; File = "config-service/Dockerfile" },
+    @{ Deployment = "eureka-service"; Container = "eureka-service"; Repository = "eureka-service"; LocalName = "yunsoftwaresystem-eureka-service"; File = "eureka-service/Dockerfile" },
+    @{ Deployment = "gateway-service"; Container = "gateway-service"; Repository = "gateway-service"; LocalName = "yunsoftwaresystem-gateway-service"; File = "gateway-service/Dockerfile" },
+    @{ Deployment = "student-service"; Container = "student-service"; Repository = "student-service"; LocalName = "yunsoftwaresystem-student-service"; File = "student-service/Dockerfile" },
+    @{ Deployment = "course-service"; Container = "course-service"; Repository = "course-service"; LocalName = "yunsoftwaresystem-course-service"; File = "course-service/Dockerfile" },
+    @{ Deployment = "teacher-service"; Container = "teacher-service"; Repository = "teacher-service"; LocalName = "yunsoftwaresystem-teacher-service"; File = "teacher-service/Dockerfile" },
+    @{ Deployment = "enrollment-service"; Container = "enrollment-service"; Repository = "enrollment-service"; LocalName = "yunsoftwaresystem-enrollment-service"; File = "enrollment-service/Dockerfile" },
+    @{ Deployment = "frontend"; Container = "frontend"; Repository = "frontend"; LocalName = "yunsoftwaresystem-frontend"; File = "frontend/Dockerfile" }
 )
 
 $CoreDeployments = @(
@@ -61,6 +72,62 @@ function Write-Step {
     param([string]$Message)
     Write-Host ""
     Write-Host "===== $Message =====" -ForegroundColor Cyan
+}
+
+function Get-ShortCommit {
+    try {
+        Push-Location $Root
+        $commit = (& git rev-parse --short=8 HEAD 2>$null).Trim()
+        Pop-Location
+        if (-not [string]::IsNullOrWhiteSpace($commit)) {
+            return $commit
+        }
+    } catch {
+        try { Pop-Location } catch {}
+    }
+    return ""
+}
+
+function Normalize-ImageTag {
+    param([string]$RequestedTag)
+    if (-not [string]::IsNullOrWhiteSpace($RequestedTag)) {
+        return $RequestedTag.Trim()
+    }
+
+    $commit = Get-ShortCommit
+    if (-not [string]::IsNullOrWhiteSpace($env:BUILD_NUMBER) -and -not [string]::IsNullOrWhiteSpace($commit)) {
+        return "$($env:BUILD_NUMBER)-$commit"
+    }
+    if (-not [string]::IsNullOrWhiteSpace($env:BUILD_NUMBER)) {
+        return "build-$($env:BUILD_NUMBER)"
+    }
+    if (-not [string]::IsNullOrWhiteSpace($commit)) {
+        return $commit
+    }
+    return "latest"
+}
+
+function Get-ImageName {
+    param([hashtable]$Definition)
+    $repo = $Definition.LocalName
+    if (-not [string]::IsNullOrWhiteSpace($ImageRegistry)) {
+        $registry = $ImageRegistry.Trim().TrimEnd("/")
+        $project = $ImageProject.Trim().Trim("/")
+        if ([string]::IsNullOrWhiteSpace($project)) {
+            $repo = "$registry/$($Definition.Repository)"
+        } else {
+            $repo = "$registry/$project/$($Definition.Repository)"
+        }
+    }
+    return "$repo`:$ImageTag"
+}
+
+function ConvertTo-BashSingleQuoted {
+    param([string]$Value)
+    if ($null -eq $Value) {
+        $Value = ""
+    }
+    return "'" + ($Value -replace "'", "'`"'`"'") + "'"
 }
 
 function Test-CommandExists {
@@ -352,15 +419,40 @@ if ([string]::IsNullOrWhiteSpace($SshPassword)) {
     $SshPassword = ConvertTo-PlainText $securePassword
 }
 
+$ImageTag = Normalize-ImageTag $ImageTag
+$Images = @(
+    foreach ($definition in $ImageDefinitions) {
+        @{
+            Deployment = $definition.Deployment
+            Container = $definition.Container
+            Name = Get-ImageName $definition
+            File = $definition.File
+        }
+    }
+)
+
+if (($PushImages -or $CreateImagePullSecret) -and [string]::IsNullOrWhiteSpace($ImageRegistry)) {
+    throw "ImageRegistry is required when PushImages or CreateImagePullSecret is enabled."
+}
+if (($PushImages -or $CreateImagePullSecret) -and ([string]::IsNullOrWhiteSpace($RegistryUsername) -or [string]::IsNullOrWhiteSpace($RegistryPassword))) {
+    throw "RegistryUsername and RegistryPassword are required when PushImages or CreateImagePullSecret is enabled."
+}
+
 Write-Step "Preflight"
 Test-CommandExists "mvn"
 Test-CommandExists "npm.cmd"
-Test-CommandExists "docker"
+Test-CommandExists $ImageBuilder
 Ensure-Paramiko
 $Helper = New-HelperScript
 Write-Host "Workspace: $Root"
 Write-Host "Master:    $MasterHost"
 Write-Host "Workers:   $($WorkerHosts -join ', ')"
+Write-Host "Image tag: $ImageTag"
+Write-Host "Image builder: $ImageBuilder"
+if (-not [string]::IsNullOrWhiteSpace($ImageRegistry)) {
+    Write-Host "Image registry: $($ImageRegistry.Trim().TrimEnd('/'))"
+    Write-Host "Image project:  $ImageProject"
+}
 
 if (-not $SkipBackendBuild) {
     Write-Step "Build backend"
@@ -378,22 +470,44 @@ if (-not $SkipFrontendBuild) {
 }
 
 if (-not $SkipImageBuild) {
-    Write-Step "Build Docker images"
+    Write-Step "Build container images"
     Push-Location $Root
     foreach ($image in $Images) {
         Write-Host "Building $($image.Name) ..."
-        docker build -t $image.Name -f $image.File .
+        & $ImageBuilder build -t $image.Name -f $image.File .
+        if ($LASTEXITCODE -ne 0) {
+            throw "$ImageBuilder build failed for $($image.Name)."
+        }
     }
     Pop-Location
 }
 
+if ($PushImages) {
+    Write-Step "Login and push images"
+    $RegistryPassword | & $ImageBuilder login $ImageRegistry -u $RegistryUsername --password-stdin
+    if ($LASTEXITCODE -ne 0) {
+        throw "$ImageBuilder login failed for registry $ImageRegistry."
+    }
+
+    foreach ($image in $Images) {
+        Write-Host "Pushing $($image.Name) ..."
+        & $ImageBuilder push $image.Name
+        if ($LASTEXITCODE -ne 0) {
+            throw "$ImageBuilder push failed for $($image.Name)."
+        }
+    }
+}
+
 if (-not $SkipImageUpload) {
-    Write-Step "Save Docker image archive"
+    Write-Step "Save image archive"
     if (Test-Path $ImageArchive) {
         Remove-Item $ImageArchive -Force
     }
     $imageNames = $Images | ForEach-Object { $_.Name }
-    docker save -o $ImageArchive @imageNames
+    & $ImageBuilder save -o $ImageArchive @imageNames
+    if ($LASTEXITCODE -ne 0) {
+        throw "$ImageBuilder save failed."
+    }
     $archiveSize = [Math]::Round((Get-Item $ImageArchive).Length / 1MB, 1)
     Write-Host "Created $ImageArchive ($archiveSize MB)"
 
@@ -421,7 +535,31 @@ $demoDataLine = ""
 if ($ApplyDemoData) {
     $demoDataLine = "kubectl exec -i -n $Namespace mysql-0 -- mysql -uroot -p$MysqlRootPassword < $RemoteRoot/scripts/sql/05-demo-data.sql"
 }
-Invoke-RemoteBash -HostName $MasterHost -Helper $Helper -TimeoutSeconds 300 -Script @"
+$imagePullSecretBlock = ""
+if ($CreateImagePullSecret) {
+    $registryLiteral = ConvertTo-BashSingleQuoted $ImageRegistry.Trim().TrimEnd("/")
+    $registryUserLiteral = ConvertTo-BashSingleQuoted $RegistryUsername
+    $registryPasswordLiteral = ConvertTo-BashSingleQuoted $RegistryPassword
+    $secretLiteral = ConvertTo-BashSingleQuoted $ImagePullSecretName
+    $secretNameJson = $ImagePullSecretName | ConvertTo-Json -Compress
+    $serviceAccountPatch = ConvertTo-BashSingleQuoted "{`"imagePullSecrets`":[{`"name`":$secretNameJson}]}"
+    $imagePullSecretBlock = @"
+kubectl create secret docker-registry $secretLiteral -n $Namespace --docker-server=$registryLiteral --docker-username=$registryUserLiteral --docker-password=$registryPasswordLiteral --dry-run=client -o yaml | kubectl apply -f -
+kubectl patch serviceaccount default -n $Namespace --type merge -p $serviceAccountPatch
+"@
+}
+
+$setImageBlock = ""
+if ($UpdateK8sImages) {
+    $setImageLines = foreach ($image in $Images) {
+        $deployment = $image.Deployment
+        $container = $image.Container
+        $imageLiteral = ConvertTo-BashSingleQuoted $image.Name
+        "kubectl set image deployment/$deployment $container=$imageLiteral -n $Namespace"
+    }
+    $setImageBlock = ($setImageLines -join "`n")
+}
+Invoke-RemoteBash -HostName $MasterHost -Helper $Helper -TimeoutSeconds 900 -Script @"
 set -e
 cd $RemoteRoot
 kubectl apply -f k8s/namespace.yaml
@@ -434,10 +572,15 @@ kubectl create configmap grafana-dashboard-provider -n $Namespace --from-file=pr
 kubectl create configmap grafana-dashboard-scms -n $Namespace --from-file=scms-dashboard.json=k8s/files/scms-dashboard.json --dry-run=client -o yaml | kubectl apply -f -
 kubectl create configmap nginx-conf -n $Namespace --from-file=nginx.conf=k8s/files/nginx.conf --dry-run=client -o yaml | kubectl apply -f -
 kubectl create configmap logstash-pipeline -n $Namespace --from-file=logstash.conf=k8s/files/logstash.conf --dry-run=client -o yaml | kubectl apply -f -
+$imagePullSecretBlock
+kubectl apply -f k8s/storage.yaml
+kubectl apply -f k8s/mysql.yaml
+kubectl rollout status statefulset/mysql -n $Namespace --timeout=420s
 kubectl apply -f k8s/apps.yaml
 kubectl apply -f k8s/frontend-nginx.yaml
 kubectl apply -f k8s/observability.yaml
 kubectl apply -f k8s/elk.yaml
+$setImageBlock
 kubectl exec -i -n $Namespace mysql-0 -- mysql -uroot -p$MysqlRootPassword < scripts/sql/06-upgrade-course-schedule-weeks.sql
 $demoDataLine
 "@
