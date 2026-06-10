@@ -161,6 +161,12 @@ EOF
 set -euo pipefail
 sudo_refresh() { printf '%s\n' "$K8S_SSH_PASSWORD" | sudo -S -v >/dev/null; }
 sudo_refresh
+if ! curl -fsS --max-time 10 "http://$IMAGE_REGISTRY/v2/" >/dev/null; then
+  echo "Local registry is not responding, restarting scms-registry"
+  sudo -n nerdctl restart scms-registry
+  sleep 5
+  curl -fsS --max-time 20 "http://$IMAGE_REGISTRY/v2/" >/dev/null
+fi
 printf '%s\n' "$REGISTRY_PASSWORD" | sudo -n nerdctl -n k8s.io --insecure-registry login "$IMAGE_REGISTRY" -u "$REGISTRY_USERNAME" --password-stdin
 images=(
   "config-service|config-service|8888"
