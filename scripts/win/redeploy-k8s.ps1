@@ -563,6 +563,7 @@ Invoke-RemoteBash -HostName $MasterHost -Helper $Helper -TimeoutSeconds 900 -Scr
 set -e
 cd $RemoteRoot
 kubectl apply -f k8s/namespace.yaml
+kubectl apply -f k8s/metrics-server.yaml
 kubectl apply -f k8s/secrets.yaml
 kubectl create configmap config-repo -n $Namespace --from-file=config-repo --dry-run=client -o yaml | kubectl apply -f -
 kubectl create configmap mysql-init-sql -n $Namespace --from-file=scripts/sql --dry-run=client -o yaml | kubectl apply -f -
@@ -580,6 +581,7 @@ kubectl apply -f k8s/apps.yaml
 kubectl apply -f k8s/frontend-nginx.yaml
 kubectl apply -f k8s/observability.yaml
 kubectl apply -f k8s/elk.yaml
+kubectl apply -f k8s/hpa.yaml
 $setImageBlock
 kubectl exec -i -n $Namespace mysql-0 -- mysql -uroot -p$MysqlRootPassword < scripts/sql/06-upgrade-course-schedule-weeks.sql
 $demoDataLine

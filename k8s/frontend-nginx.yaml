@@ -32,11 +32,18 @@ spec:
         app: frontend
         app.kubernetes.io/part-of: student-course-cloud
     spec:
-      nodeSelector:
-        scms-role: app
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 80
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/part-of: student-course-cloud
+                topologyKey: kubernetes.io/hostname
       containers:
         - name: frontend
-          image: yunsoftwaresystem-frontend:latest
+          image: 192.168.40.129:5000/student-course/frontend:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80
@@ -46,12 +53,14 @@ spec:
               port: 80
             initialDelaySeconds: 5
             periodSeconds: 10
+            timeoutSeconds: 5
           livenessProbe:
             httpGet:
               path: /
               port: 80
             initialDelaySeconds: 20
             periodSeconds: 20
+            timeoutSeconds: 5
           resources:
             requests:
               cpu: 25m
@@ -96,8 +105,15 @@ spec:
         app: nginx
         app.kubernetes.io/part-of: student-course-cloud
     spec:
-      nodeSelector:
-        scms-role: app
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 80
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/part-of: student-course-cloud
+                topologyKey: kubernetes.io/hostname
       containers:
         - name: nginx
           image: nginx:1.27-alpine
@@ -110,12 +126,14 @@ spec:
               port: 80
             initialDelaySeconds: 5
             periodSeconds: 10
+            timeoutSeconds: 5
           livenessProbe:
             httpGet:
               path: /
               port: 80
             initialDelaySeconds: 20
             periodSeconds: 20
+            timeoutSeconds: 5
           resources:
             requests:
               cpu: 25m

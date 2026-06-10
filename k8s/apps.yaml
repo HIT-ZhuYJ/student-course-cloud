@@ -32,11 +32,18 @@ spec:
         app: config-service
         app.kubernetes.io/part-of: student-course-cloud
     spec:
-      nodeSelector:
-        scms-role: app
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 80
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/part-of: student-course-cloud
+                topologyKey: kubernetes.io/hostname
       containers:
         - name: config-service
-          image: yunsoftwaresystem-config-service:latest
+          image: 192.168.40.129:5000/student-course/config-service:latest
           imagePullPolicy: IfNotPresent
           env:
             - name: TZ
@@ -47,12 +54,20 @@ spec:
               value: file:/app/config-repo
           ports:
             - containerPort: 8888
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8888
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 36
           readinessProbe:
             httpGet:
               path: /actuator/health
               port: 8888
             initialDelaySeconds: 20
             periodSeconds: 10
+            timeoutSeconds: 5
             failureThreshold: 18
           livenessProbe:
             httpGet:
@@ -60,6 +75,7 @@ spec:
               port: 8888
             initialDelaySeconds: 60
             periodSeconds: 20
+            timeoutSeconds: 5
             failureThreshold: 6
           resources:
             requests:
@@ -113,11 +129,18 @@ spec:
         app: eureka-service
         app.kubernetes.io/part-of: student-course-cloud
     spec:
-      nodeSelector:
-        scms-role: app
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 80
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/part-of: student-course-cloud
+                topologyKey: kubernetes.io/hostname
       containers:
         - name: eureka-service
-          image: yunsoftwaresystem-eureka-service:latest
+          image: 192.168.40.129:5000/student-course/eureka-service:latest
           imagePullPolicy: IfNotPresent
           env:
             - name: TZ
@@ -128,12 +151,20 @@ spec:
               value: k8s
           ports:
             - containerPort: 8761
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8761
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 36
           readinessProbe:
             httpGet:
               path: /actuator/health
               port: 8761
             initialDelaySeconds: 35
             periodSeconds: 10
+            timeoutSeconds: 5
             failureThreshold: 18
           livenessProbe:
             httpGet:
@@ -141,6 +172,7 @@ spec:
               port: 8761
             initialDelaySeconds: 90
             periodSeconds: 20
+            timeoutSeconds: 5
             failureThreshold: 6
           resources:
             requests:
@@ -184,11 +216,18 @@ spec:
         app: student-service
         app.kubernetes.io/part-of: student-course-cloud
     spec:
-      nodeSelector:
-        scms-role: app
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 80
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/part-of: student-course-cloud
+                topologyKey: kubernetes.io/hostname
       containers:
         - name: student-service
-          image: yunsoftwaresystem-student-service:latest
+          image: 192.168.40.129:5000/student-course/student-service:latest
           imagePullPolicy: IfNotPresent
           env:
             - name: TZ
@@ -214,12 +253,20 @@ spec:
                   key: JWT_SECRET
           ports:
             - containerPort: 8081
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8081
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 36
           readinessProbe:
             httpGet:
               path: /actuator/health
               port: 8081
             initialDelaySeconds: 35
             periodSeconds: 10
+            timeoutSeconds: 5
             failureThreshold: 18
           livenessProbe:
             httpGet:
@@ -227,6 +274,7 @@ spec:
               port: 8081
             initialDelaySeconds: 90
             periodSeconds: 20
+            timeoutSeconds: 5
             failureThreshold: 6
           resources:
             requests:
@@ -270,11 +318,18 @@ spec:
         app: course-service
         app.kubernetes.io/part-of: student-course-cloud
     spec:
-      nodeSelector:
-        scms-role: app
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 80
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/part-of: student-course-cloud
+                topologyKey: kubernetes.io/hostname
       containers:
         - name: course-service
-          image: yunsoftwaresystem-course-service:latest
+          image: 192.168.40.129:5000/student-course/course-service:latest
           imagePullPolicy: IfNotPresent
           env:
             - name: TZ
@@ -300,12 +355,20 @@ spec:
                   key: JWT_SECRET
           ports:
             - containerPort: 8082
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8082
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 36
           readinessProbe:
             httpGet:
               path: /actuator/health
               port: 8082
             initialDelaySeconds: 35
             periodSeconds: 10
+            timeoutSeconds: 5
             failureThreshold: 18
           livenessProbe:
             httpGet:
@@ -313,6 +376,7 @@ spec:
               port: 8082
             initialDelaySeconds: 90
             periodSeconds: 20
+            timeoutSeconds: 5
             failureThreshold: 6
           resources:
             requests:
@@ -356,11 +420,18 @@ spec:
         app: teacher-service
         app.kubernetes.io/part-of: student-course-cloud
     spec:
-      nodeSelector:
-        scms-role: data
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 80
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/part-of: student-course-cloud
+                topologyKey: kubernetes.io/hostname
       containers:
         - name: teacher-service
-          image: yunsoftwaresystem-teacher-service:latest
+          image: 192.168.40.129:5000/student-course/teacher-service:latest
           imagePullPolicy: IfNotPresent
           env:
             - name: TZ
@@ -386,12 +457,20 @@ spec:
                   key: JWT_SECRET
           ports:
             - containerPort: 8083
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8083
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 36
           readinessProbe:
             httpGet:
               path: /actuator/health
               port: 8083
             initialDelaySeconds: 35
             periodSeconds: 10
+            timeoutSeconds: 5
             failureThreshold: 18
           livenessProbe:
             httpGet:
@@ -399,6 +478,7 @@ spec:
               port: 8083
             initialDelaySeconds: 90
             periodSeconds: 20
+            timeoutSeconds: 5
             failureThreshold: 6
           resources:
             requests:
@@ -442,11 +522,18 @@ spec:
         app: enrollment-service
         app.kubernetes.io/part-of: student-course-cloud
     spec:
-      nodeSelector:
-        scms-role: data
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 80
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/part-of: student-course-cloud
+                topologyKey: kubernetes.io/hostname
       containers:
         - name: enrollment-service
-          image: yunsoftwaresystem-enrollment-service:latest
+          image: 192.168.40.129:5000/student-course/enrollment-service:latest
           imagePullPolicy: IfNotPresent
           env:
             - name: TZ
@@ -472,12 +559,20 @@ spec:
                   key: JWT_SECRET
           ports:
             - containerPort: 8084
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8084
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 36
           readinessProbe:
             httpGet:
               path: /actuator/health
               port: 8084
             initialDelaySeconds: 45
             periodSeconds: 10
+            timeoutSeconds: 5
             failureThreshold: 18
           livenessProbe:
             httpGet:
@@ -485,6 +580,7 @@ spec:
               port: 8084
             initialDelaySeconds: 100
             periodSeconds: 20
+            timeoutSeconds: 5
             failureThreshold: 6
           resources:
             requests:
@@ -530,11 +626,18 @@ spec:
         app: gateway-service
         app.kubernetes.io/part-of: student-course-cloud
     spec:
-      nodeSelector:
-        scms-role: app
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 80
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/part-of: student-course-cloud
+                topologyKey: kubernetes.io/hostname
       containers:
         - name: gateway-service
-          image: yunsoftwaresystem-gateway-service:latest
+          image: 192.168.40.129:5000/student-course/gateway-service:latest
           imagePullPolicy: IfNotPresent
           env:
             - name: TZ
@@ -560,12 +663,20 @@ spec:
                   key: JWT_SECRET
           ports:
             - containerPort: 8080
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 36
           readinessProbe:
             httpGet:
               path: /actuator/health
               port: 8080
             initialDelaySeconds: 45
             periodSeconds: 10
+            timeoutSeconds: 5
             failureThreshold: 18
           livenessProbe:
             httpGet:
@@ -573,6 +684,7 @@ spec:
               port: 8080
             initialDelaySeconds: 100
             periodSeconds: 20
+            timeoutSeconds: 5
             failureThreshold: 6
           resources:
             requests:

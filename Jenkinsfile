@@ -12,6 +12,7 @@ pipeline {
     NPM_CONFIG_REGISTRY = 'https://registry.npmmirror.com'
     REPO_URL = 'https://github.com/HIT-ZhuYJ/student-course-cloud.git'
     SOURCE_BRANCH = 'main'
+    GITHUB_COM_RESOLVE_CANDIDATES = 'github.com:443:140.82.114.4 github.com:443:140.82.113.4 github.com:443:140.82.121.4 github.com:443:20.205.243.166'
     MASTER_HOST = '192.168.40.129'
     NAMESPACE = 'student-course'
     IMAGE_REGISTRY = '192.168.40.129:5000'
@@ -27,15 +28,18 @@ pipeline {
 set -euo pipefail
 find "$WORKSPACE" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
 git config --global http.version HTTP/1.1
-for i in 1 2 3; do
-  echo "Clone attempt $i"
-  if git clone --depth 1 --branch "$SOURCE_BRANCH" "$REPO_URL" "$WORKSPACE"; then
-    git rev-parse --short HEAD
-    git status --short
-    exit 0
-  fi
-  find "$WORKSPACE" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
-  sleep 8
+git config --global --unset-all http.curloptResolve || true
+for resolve in $GITHUB_COM_RESOLVE_CANDIDATES; do
+  for i in 1 2; do
+    echo "Clone attempt $i with $resolve"
+    if git -c "http.curloptResolve=$resolve" clone --depth 1 --branch "$SOURCE_BRANCH" "$REPO_URL" "$WORKSPACE"; then
+      git rev-parse --short HEAD
+      git status --short
+      exit 0
+    fi
+    find "$WORKSPACE" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+    sleep 8
+  done
 done
 exit 1
 '''
@@ -173,11 +177,15 @@ for item in "${images[@]}"; do
   rest="${item#*|}"
   container="${rest%%|*}"
   image="$IMAGE_REGISTRY/$IMAGE_PROJECT/$module:$IMAGE_TAG"
+  latest_image="$IMAGE_REGISTRY/$IMAGE_PROJECT/$module:latest"
   dockerfile="$module/Dockerfile.ci"
   echo "Building ${image} from ${dockerfile}"
   sudo -n nerdctl -n k8s.io --insecure-registry build -t "$image" -f "$dockerfile" .
+  sudo -n nerdctl -n k8s.io --insecure-registry tag "$image" "$latest_image"
   echo "Pushing ${image}"
   sudo -n nerdctl -n k8s.io --insecure-registry push "$image"
+  echo "Pushing ${latest_image}"
+  sudo -n nerdctl -n k8s.io --insecure-registry push "$latest_image"
 done
 '''
         }
@@ -194,6 +202,7 @@ done
 set -euo pipefail
 kubectl delete pod -n "$NAMESPACE" --field-selector=status.phase=Failed || true
 kubectl apply -f k8s/namespace.yaml
+kubectl apply -f k8s/metrics-server.yaml
 kubectl apply -f k8s/secrets.yaml
 kubectl apply -f k8s/storage.yaml
 kubectl create configmap config-repo -n "$NAMESPACE" --from-file=config-repo --dry-run=client -o yaml | kubectl apply -f -
@@ -219,6 +228,7 @@ kubectl apply -f k8s/apps.yaml
 kubectl apply -f k8s/frontend-nginx.yaml
 kubectl apply -f k8s/observability.yaml
 kubectl apply -f k8s/elk.yaml
+kubectl apply -f k8s/hpa.yaml
 for d in eureka-service student-service course-service teacher-service enrollment-service gateway-service; do
   kubectl set env "deployment/$d" CONFIG_SERVER_URL="http://config-service.${NAMESPACE}.svc.cluster.local:8888" -n "$NAMESPACE"
 done
@@ -280,9 +290,17 @@ done
 set -euo pipefail
 commit="$(git rev-parse --short=8 HEAD)"
 auth="$(printf '%s:%s' "$GITHUB_USERNAME" "$GITHUB_TOKEN" | base64 | tr -d '\\n')"
-git -c "http.extraHeader=Authorization: Basic ${auth}" \
-  push "$REPO_URL" "+HEAD:refs/heads/$RELEASE_BRANCH"
-echo "Published deployed commit ${commit} to ${RELEASE_BRANCH}"
+for resolve in $GITHUB_COM_RESOLVE_CANDIDATES; do
+  echo "Publishing with $resolve"
+  if git -c "http.extraHeader=Authorization: Basic ${auth}" \
+    -c "http.curloptResolve=$resolve" \
+    push "$REPO_URL" "+HEAD:refs/heads/$RELEASE_BRANCH"; then
+    echo "Published deployed commit ${commit} to ${RELEASE_BRANCH}"
+    exit 0
+  fi
+  sleep 8
+done
+exit 1
 '''
         }
       }

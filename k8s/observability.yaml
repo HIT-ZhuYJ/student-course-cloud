@@ -29,8 +29,15 @@ spec:
         app: prometheus
         app.kubernetes.io/part-of: student-course-cloud
     spec:
-      nodeSelector:
-        scms-role: data
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 80
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/part-of: student-course-cloud
+                topologyKey: kubernetes.io/hostname
       containers:
         - name: prometheus
           image: prom/prometheus:v2.54.1
@@ -92,8 +99,15 @@ spec:
         app: grafana
         app.kubernetes.io/part-of: student-course-cloud
     spec:
-      nodeSelector:
-        scms-role: data
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 80
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/part-of: student-course-cloud
+                topologyKey: kubernetes.io/hostname
       containers:
         - name: grafana
           image: grafana/grafana:11.2.2

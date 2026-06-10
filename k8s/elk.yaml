@@ -29,8 +29,15 @@ spec:
         app: elasticsearch
         app.kubernetes.io/part-of: student-course-cloud
     spec:
-      nodeSelector:
-        scms-role: data
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 80
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/part-of: student-course-cloud
+                topologyKey: kubernetes.io/hostname
       containers:
         - name: elasticsearch
           image: elasticsearch:8.15.2
@@ -50,6 +57,7 @@ spec:
               port: 9200
             initialDelaySeconds: 30
             periodSeconds: 10
+            timeoutSeconds: 5
             failureThreshold: 18
           resources:
             requests:
@@ -178,8 +186,15 @@ spec:
         app: kibana
         app.kubernetes.io/part-of: student-course-cloud
     spec:
-      nodeSelector:
-        scms-role: data
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 80
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/part-of: student-course-cloud
+                topologyKey: kubernetes.io/hostname
       containers:
         - name: kibana
           image: kibana:8.15.2
@@ -195,6 +210,7 @@ spec:
               port: 5601
             initialDelaySeconds: 60
             periodSeconds: 10
+            timeoutSeconds: 5
             failureThreshold: 30
           resources:
             requests:
