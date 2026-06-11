@@ -65,7 +65,7 @@ exit 1
     stage('Frontend build test') {
       steps {
         dir('frontend') {
-          sh 'npm ci --registry=https://registry.npmmirror.com && npm run build'
+          sh 'npm ci --registry=https://registry.npmmirror.com && VITE_API_BASE_URL=/ npm run build'
         }
       }
     }
