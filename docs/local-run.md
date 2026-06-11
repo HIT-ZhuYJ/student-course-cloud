@@ -4,7 +4,7 @@
 
 本文档说明如何在本机启动“学生课程管理系统”的完整演示环境。系统采用前后端分离和微服务架构，前端只访问 `gateway-service`，后端服务通过 Eureka 注册发现，通过 Gateway 对外暴露 `/api/**` 接口。
 
-本阶段只包含本机运行内容，不包含 Kubernetes、Jenkins、Service Mesh 等部署脚本。
+本文只覆盖本机运行流程。Kubernetes 三节点部署与 Jenkins CI/CD 验收流程见 `docs/k8s-final-deployment-plan.md` 和 `docs/k8s-scheduling-and-master-jenkins.md`。
 
 ## 2. 环境要求
 

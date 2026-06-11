@@ -12,7 +12,7 @@
 6. 服务之间通过注册中心发现服务，通过 OpenFeign 调用接口完成协作。
 7. 在本机环境中完成注册发现、网关转发、JWT 鉴权、服务调用、负载均衡和熔断降级演示。
 
-本阶段重点是“本机完整运行和课程演示”，不实现 Kubernetes、Jenkins、ELK、Service Mesh 等复杂部署内容。
+本架构文档重点说明学生课程管理系统的微服务拆分、数据自治和本机运行链路。Kubernetes 三节点部署、Jenkins CI/CD 与观测组件的验收说明见 `docs/k8s-final-deployment-plan.md` 和 `docs/k8s-scheduling-and-master-jenkins.md`。
 
 ## 2. 为什么本项目是微服务架构
 
